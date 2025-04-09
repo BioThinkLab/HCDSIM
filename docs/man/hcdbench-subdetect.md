@@ -13,8 +13,7 @@ usage: hcdbench subdetect [-h] --classification-files  [...] --tool-names  [...]
 options:
   -h, --help            show this help message and exit
   --classification-files  [ ...]
-                        Paths to the classification files, separated by spaces. Each file must contain 'cell_id' and 'clone_id' columns. The 'clone_id' column
-                        represents classification information, while 'cell_id' combines 'ground_truth_clone_id' and cell details using an underscore.
+                        Paths to the classification files, separated by spaces. Each file must contain 'cell_id' and 'clone_id' columns. The 'clone_id' column represents classification information, while 'cell_id' combines 'ground_truth_clone_id' and cell details using an underscore.
   --tool-names  [ ...]  List of tool names corresponding to the classification files
   --output-dir          Path to the file where the results will be saved, default: './output'
 ```

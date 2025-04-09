@@ -1,5 +1,5 @@
 import argparse
-from hcdsim.bench import subdetect, cnaccuracy,hcidentify,cnretain,mirrorsubclone,cnstates,hcparent,hcCNchange
+from hcdsim.bench import cnclass, cndetect, hccnstable, hconsetacc, hconsetcn, subdetect, mirrorsubclone,hccnchange,hcPhasing
 
 def main():
     """
@@ -11,13 +11,15 @@ def main():
 
     # Add subcommands
     subdetect.add_subdetect_subparser(subparsers)
-    cnaccuracy.add_cnaccuracy_subparser(subparsers)
-    hcidentify.add_hcidentify_subparser(subparsers)
-    hcparent.add_hcparent_subparser(subparsers)
-    hcCNchange.add_hcCNchange_subparser(subparsers)
-    cnretain.add_cnretain_subparser(subparsers)
+    cndetect.add_cndetect_subparser(subparsers)
+    hconsetacc.add_hconsetacc_subparser(subparsers)
+    hconsetcn.add_hconsetcn_subparser(subparsers)
+    hccnchange.add_hccnchange_subparser(subparsers)
+    hccnstable.add_hccnstable_subparser(subparsers)
     mirrorsubclone.add_mirrorsubclone_subparser(subparsers)
-    cnstates.add_cnstates_subparser(subparsers)
+    cnclass.add_cnclass_subparser(subparsers)
+    hcPhasing.add_hcPhasing_subparser(subparsers)
+
 
 
     # Parse arguments
@@ -26,20 +28,22 @@ def main():
     # Execute corresponding logic based on the command
     if args.command == "subdetect": 
         subdetect.run(args)
-    elif args.command == "cnaccuracy":
-        cnaccuracy.run(args)
-    elif args.command == "hcidentify":
-        hcidentify.run(args)
-    elif args.command == "hcparent":
-        hcparent.run(args)
-    elif args.command == "hcCNchange":
-        hcCNchange.run(args)
-    elif args.command == "cnretain":
-        cnretain.run(args)
+    elif args.command == "cndetect":
+        cndetect.run(args)
+    elif args.command == "hconsetacc":
+        hconsetacc.run(args)
+    elif args.command == "hconsetcn":
+        hconsetcn.run(args)
+    elif args.command == "hccnchange":
+        hccnchange.run(args)
+    elif args.command == "hccnstable":
+        hccnstable.run(args)
     elif args.command == "mirrorsubclone":
         mirrorsubclone.run(args)
-    elif args.command == "cnstates":
-        cnstates.run(args)
+    elif args.command == "cnclass":
+        cnclass.run(args)
+    elif args.command == "hcPhasing":
+        hcPhasing.run(args)
     else:
         parser.print_help()
 

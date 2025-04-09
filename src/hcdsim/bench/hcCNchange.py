@@ -1,4 +1,4 @@
-# commands/hcCNchange.py
+# commands/hccnchange.py
 import numpy as np
 import pandas as pd
 import os
@@ -6,14 +6,14 @@ import os
 from sklearn.metrics import mean_squared_error
 
 
-def add_hcCNchange_subparser(subparsers):
+def add_hccnchange_subparser(subparsers):
     """
-    Add the hcCNchange subcommand to the CLI tool.
+    Add the hccnchange subcommand to the CLI tool.
 
     This subcommand is used to identify if the CN change from parent to child is correctly identified, using RMSE and ACC.
     """
     parser = subparsers.add_parser(
-        "hcCNchange",
+        "hccnchange",
         help="Identify if the CN change from parent to child is correctly identified, using RMSE and ACC."
     )
     parser.add_argument(
@@ -114,7 +114,7 @@ def calculate_CN_change_rmse(ground_truth,predict_data):
     
     return rmse
 
-# python src/main.py hcCNchange /
+# python src/main.py hccnchange /
 # --tool-maternal-cna-files data/chisel_5x_maternal_cnv.csv /
 # --tool-paternal-cna-files data/chisel_5x_paternal_cnv.csv /
 # --tool-names chisel_5x --changes-file profile/changes.csv /

@@ -1,15 +1,15 @@
-# hcdbench hcCNchange
+# hcdbench hccnchange
 
-`hcdbench hcCNchange` command to identify if the CN change from parent to child is correctly identified, using RMSE and ACC.
+`hcdbench hccnchange` command to identify if the CN change from parent to child is correctly identified, using RMSE and ACC.
 
 
 ## Overview
 
-This script implements a subcommand named `hcCNchange`, which is used to evaluate whether CN changes from parent to child are correctly identified. 
+This script implements a subcommand named `hccnchange`, which is used to evaluate whether CN changes from parent to child are correctly identified. 
 
 ## Parameters
 ```shell
-usage: hcdbench hcCNchange [-h] --tool-maternal-cna-files  [...] --tool-paternal-cna-files  [...] --tool-names  [...] --changes-file  [--output-dir]
+usage: hcdbench hccnchange [-h] --tool-maternal-cna-files  [...] --tool-paternal-cna-files  [...] --tool-names  [...] --changes-file  [--output-dir]
 
 options:
   -h, --help            show this help message and exit
@@ -48,9 +48,9 @@ options:
 ## Example Usage
 
 ```shell
-hcdbench hcCNchange \
+hcdbench hccnchange \
  --tool-maternal-cna-files data/chisel_5x_maternal_cnv.csv \
  --tool-paternal-cna-files data/chisel_5x_paternal_cnv.csv \
- --tool-names chisel_5x \                                                                                                        
+ --tool-names chisel_5x \
  --changes-file profile/changes.csv 
 ```
