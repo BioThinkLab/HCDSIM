@@ -355,13 +355,14 @@ Click on the name of each command to obtain a description of all the available p
 | SubCommand | Description |
 |--------------|-------------|
 | [subdetect](man/hcdbench-subdetect.md) | Calculate AMI (Adjusted Mutual Information) and ARI (Adjusted Rand Index). |
-| [cnaccuracy](man/hcdbench-cnaccuracy.md) | Calculate the RMSE,ACC,SCC of CN status at the bin level. |
-| [hcidentify](man/hcdbench-hcidentify.md) | Identify whether CNA events are correctly detected at their first branch of evolution, using ACC. |
-| [hcparent](man/hcdbench-hcparent.md) | Identify whether the parent CN is correctly inferred using RMSE abd ACC. |
-| [hcCNchange](man/hcdbench-hcCNchange.md) | Identify if the CN change from parent to child is correctly identified, using RMSE and ACC. |
-| [cnretain](man/hcdbench-cnretain.md) | Calculate the ACC of Evolutionary CN Stability. |
+| [cndetect](man/hcdbench-cndetect.md) | Calculate the RMSE, ACC, SCC of CN status at the bin level. |
+| [cnclass](man/hcdbench-cnclass.md) | Calculate CN state detection metrics at the bin level. |
+| [hconsetcn](man/hcdbench-hconsetcn.md) | Identify whether the parent CN is correctly inferred using RMSE and ACC. |
+| [hccnchange](man/hcdbench-hccnchange.md) | Identify if the CN change from parent to child is correctly identified, using RMSE and ACC. |
+| [hconsetacc ](man/hcdbench-hconsetacc.md) | Identify whether CNA events are correctly detected at their first branch of evolution, using ACC. |
+| [hccnstable](man/hcdbench-hccnstable.md) | Calculate the ACC of Evolutionary CN Stability. |
 | [mirrorsubclone](man/hcdbench-mirrorsubclone.md) | Calculate the RMSE,ACC of Mirror-subclone CNA. |
-| [cnstates](man/hcdbench-cnstates.md) | Calculate CN state detection metrics at the bin level. |
+| [hcPhasing](man/hcdbench-hcPhasing.md) | Evaluate haplotype phasing using mismatch and switch errors. |
 
 [Github]: https://github.com/xikanfeng2/HCDSIM/tree/main/datasets/hcCNA-bench-large/profile
 [Benchmark]: https://github.com/xikanfeng2/HCDSIM/tree/main/datasets/hcdbench-example-data/
