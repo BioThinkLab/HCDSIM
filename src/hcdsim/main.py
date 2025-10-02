@@ -6,10 +6,11 @@ import random
 import sys
 from collections import deque
 from multiprocessing import Pool, Value, Lock
+from scipy.stats import poisson
 
 import pandas as pd
 
-from . import random_tree
+from . import beta_splitting_model_tree as random_tree
 from . import utils
 from .utils import ProgressBar, bcolors
 
@@ -52,7 +53,13 @@ class HCDSIM:
                 outdir: str = './', 
                 clone_no: int = 2, 
                 cell_no: int = 2, 
-                max_tree_depth: int = 4, 
+                tree_alpha=10.0, 
+                tree_beta=10.0, 
+                max_tree_depth=4, 
+                tree_depth_sigma=0.5, 
+                max_node_children=4, 
+                tree_balance_factor=0.8, 
+                tree_seed=None,
                 bin_size: str = '5Mb', 
                 snp_ratio: float = 0.001, 
                 thread: int = None, 
@@ -69,6 +76,8 @@ class HCDSIM:
                 goh_cna_no: int = 10, 
                 mirror_cna_no: int = 10, 
                 barcode_len: int = 12,
+                lorenz_x: float = 0.5,
+                lorenz_y: float = 0.4,
                 wgsim: str = 'wgsim', 
                 samtools: str = 'samtools', 
                 bwa: str = 'bwa', 
@@ -1177,11 +1186,15 @@ class HCDSIM:
                                 else:
                                     new_m_sequence += m_sequence[pos]
                                     new_p_sequence += p_sequence[pos]
-                            cnv_m_sequence = new_m_sequence * m_cnv
-                            cnv_p_sequence = new_p_sequence * p_cnv
+                            # cnv_m_sequence = new_m_sequence * m_cnv
+                            # cnv_p_sequence = new_p_sequence * p_cnv
+                            cnv_m_sequence = new_m_sequence
+                            cnv_p_sequence = new_p_sequence
                         else:   
-                            cnv_m_sequence = m_sequence * m_cnv
-                            cnv_p_sequence = p_sequence * p_cnv
+                            # cnv_m_sequence = m_sequence * m_cnv
+                            # cnv_p_sequence = p_sequence * p_cnv
+                            cnv_m_sequence = m_sequence
+                            cnv_p_sequence = p_sequence
                         m_output.write(cnv_m_sequence)
                         p_output.write(cnv_p_sequence)
                         clone.maternal_fasta_length += len(cnv_m_sequence)
@@ -1195,6 +1208,7 @@ class HCDSIM:
         # utils.runcmd(command, self.outdir)
         gfasta_bar.progress(advance=True, msg="Finish generating fasta file for {}".format(clone.name))
         return (clone)
+    
     def _find_mirrored_clones(self, cnv_profile):
         """
         Identify rows with mirrored-clone CNAs in a given CNV CSV file, excluding cases where the 
@@ -1298,7 +1312,7 @@ class HCDSIM:
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
         utils.runcmd(command, wgsim_log)
 
-    def _generate_fastq_for_each_clone(self, job):
+    def _generate_fastq_for_each_clone_bk(self, job):
         (clone, outdir) = job
         gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name))
 
@@ -1320,6 +1334,160 @@ class HCDSIM:
 
         self._wgsim_process(pe_reads,clone.paternal_fasta,fq1,fq2)
         gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name))
+
+    def _run_wgsim_for_region(self, pe_reads, fasta_region_file, temp_fq1, temp_fq2):
+        """A helper function to run wgsim for a single small region."""
+        if pe_reads <= 0:
+            return
+        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,pe_reads,self.reads_len,fasta_region_file,temp_fq1,temp_fq2)
+        wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
+        utils.runcmd(command, wgsim_log)
+
+    def _generate_fastq_for_each_clone(self, job):
+        """
+        Generates biased FASTQ files for a single clone, keeping maternal and paternal files separate.
+        """
+        (clone, chrom_ref_df, outdir) = job
+        gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name))
+        
+        temp_dir = os.path.join(self.outdir, 'temp', clone.name)
+        os.makedirs(temp_dir, exist_ok=True)
+
+        # 定义最终的母本和父本FASTQ文件名
+        final_maternal_fq1 = os.path.join(outdir, f'{clone.name}_maternal_r1.fq')
+        final_maternal_fq2 = os.path.join(outdir, f'{clone.name}_maternal_r2.fq')
+        final_paternal_fq1 = os.path.join(outdir, f'{clone.name}_paternal_r1.fq')
+        final_paternal_fq2 = os.path.join(outdir, f'{clone.name}_paternal_r2.fq')
+
+        final_files = [final_maternal_fq1, final_maternal_fq2, final_paternal_fq1, final_paternal_fq2]
+        for f in final_files:
+            open(f, 'w').close()
+
+        Aa, Bb = utils.get_alpha_beta(self.lorenz_x, self.lorenz_y)
+        self.log(f"  > Lorenz curve parameters for {clone.name}: Alpha={Aa:.2f}, Beta={Bb:.2f}")
+
+        for chrom in sorted(chrom_ref_df['Chromosome'].unique()):
+            self.log(f"  > Processing chromosome {chrom}...")
+            chrom_bins_df = chrom_ref_df[chrom_ref_df['Chromosome'] == chrom].reset_index(drop=True)
+            num_windows = len(chrom_bins_df)
+            
+            interval = max(10, num_windows // 100)
+            cov_scalers = utils.gen_coverage(num_windows=num_windows, interval=interval, Aa=Aa, Bb=Bb)
+
+            if len(cov_scalers) != num_windows:
+                print(f"    ! Warning: Scaler length mismatch on {chrom}. Got {len(cov_scalers)}, expected {num_windows}. Skipping chrom.")
+                continue
+
+            for index, row in chrom_bins_df.iterrows():
+                start, end = int(row['Start']), int(row['End'])
+                bin_size = end - start
+                
+                m_cnv = int(row[f'{clone.name}_maternal_cnas'])
+                p_cnv = int(row[f'{clone.name}_paternal_cnas'])
+                total_cn = m_cnv + p_cnv
+                
+                if total_cn == 0:
+                    continue
+                
+                cov_scaler = cov_scalers[index]
+                
+                base_diploid_pe_reads = (self.clone_coverage * bin_size) / (self.reads_len * 2)
+                adjusted_total_pe_reads = base_diploid_pe_reads * (total_cn / 2) * cov_scaler
+                total_reads_sampled = poisson.rvs(adjusted_total_pe_reads)
+                m_pe_reads = round(total_reads_sampled * (m_cnv / total_cn))
+                p_pe_reads = round(total_reads_sampled * (p_cnv / total_cn))
+
+                region_str = f"{chrom}:{start}-{end}"
+
+                if m_pe_reads > 0:
+                    region_fasta = os.path.join(temp_dir, "m_region.fa")
+                    temp_fq1 = os.path.join(temp_dir, "m_r1.fq")
+                    temp_fq2 = os.path.join(temp_dir, "m_r2.fq")
+                    
+                    with open(region_fasta, 'w') as f_out:
+                        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+                        comand = ' '.join(['samtools', 'faidx', clone.maternal_fasta, region_str])
+                        utils.runcmd(comand, samtools_log)
+                    
+                    self._run_wgsim_for_region(m_pe_reads, region_fasta, temp_fq1, temp_fq2)
+                    
+                    if os.path.exists(temp_fq1):
+                        os.system(f'cat {temp_fq1} >> {final_maternal_fq1}')
+                        os.system(f'cat {temp_fq2} >> {final_maternal_fq2}')
+
+                if p_pe_reads > 0:
+                    region_fasta = os.path.join(temp_dir, "p_region.fa")
+                    temp_fq1 = os.path.join(temp_dir, "p_r1.fq")
+                    temp_fq2 = os.path.join(temp_dir, "p_r2.fq")
+
+                    with open(region_fasta, 'w') as f_out:
+                        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+                        command = ' '.join(['samtools', 'faidx', clone.paternal_fasta, region_str])
+                        utils.runcmd(command, samtools_log)
+                    
+                    self._run_wgsim_for_region(p_pe_reads, region_fasta, temp_fq1, temp_fq2)
+                    
+                    if os.path.exists(temp_fq1):
+                        os.system(f'cat {temp_fq1} >> {final_paternal_fq1}')
+                        os.system(f'cat {temp_fq2} >> {final_paternal_fq2}')
+        gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name))
+
+    def run_readcount_generation(self, clones, chrom_ref_df, lorenz_x, lorenz_y):
+        """
+        Generates a read count matrix directly without creating FASTQ files.
+        """
+        print("\n--- Starting Read Count Matrix Generation Workflow ---")
+        
+        Aa, Bb = utils.get_alpha_beta(lorenz_x, lorenz_y)
+        print(f"Global Lorenz curve parameters: Alpha={Aa:.2f}, Beta={Bb:.2f}")
+
+        output_file = os.path.join(self.outdir, 'readcounts.tsv')
+        all_counts = []
+
+        for chrom in sorted(chrom_ref_df['Chromosome'].unique()):
+            print(f"  > Processing chromosome {chrom} for read counts...")
+            chrom_bins_df = chrom_ref_df[chrom_ref_df['Chromosome'] == chrom].reset_index(drop=True)
+            num_windows = len(chrom_bins_df)
+            
+            interval = max(10, num_windows // 100)
+            cov_scalers = utils.gen_coverage(num_windows=num_windows, interval=interval, Aa=Aa, Bb=Bb)
+            
+            if len(cov_scalers) != num_windows:
+                print(f"    ! Warning: Scaler length mismatch on {chrom}. Skipping.")
+                continue
+
+            for index, row in chrom_bins_df.iterrows():
+                start, end = int(row['Start']), int(row['End'])
+                bin_size = end - start
+                cov_scaler = cov_scalers[index]
+                
+                base_diploid_pe_reads = (self.clone_coverage * bin_size) / (self.reads_len * 2)
+
+                for clone in clones:
+                    m_cnv = int(row[f'{clone.name}_maternal_cnas'])
+                    p_cnv = int(row[f'{clone.name}_paternal_cnas'])
+                    total_cn = m_cnv + p_cnv
+                    
+                    if total_cn == 0:
+                        m_count, p_count = 0, 0
+                    else:
+                        adjusted_total_pe_reads = base_diploid_pe_reads * (total_cn / 2) * cov_scaler
+                        total_reads_sampled = poisson.rvs(adjusted_total_pe_reads)
+                        m_count = round(total_reads_sampled * (m_cnv / total_cn))
+                        p_count = round(total_reads_sampled * (p_cnv / total_cn))
+                    
+                    all_counts.append({
+                        'CELL': clone.name,
+                        'chrom': chrom,
+                        'start': start,
+                        'end': end,
+                        'Acount': m_count,
+                        'Bcount': p_count
+                    })
+
+        count_df = pd.DataFrame(all_counts)
+        count_df.to_csv(output_file, sep='\t', index=False)
+        print(f"--- Read Count Matrix Generation Complete. Output: {output_file} ---")
 
     def _alignment_for_each_clone(self, job):
         (clone, fastq_dir, bam_dir, log_dir) = job
@@ -1519,6 +1687,7 @@ class HCDSIM:
         self._call_bcftools(snp_bed, cell_bam, cell_vcf_file, cell_count_file)
         bcftools_bar.progress(advance=True, msg="Finish germinal SNPs on {}".format(cell))
 
+    @utils.log_runtime
     def gprofile(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1534,7 +1703,7 @@ class HCDSIM:
 
         # generate random clone tree and set root as normal clone
         self.log('Generating random cell-lineage tree...', level='PROGRESS')
-        root = random_tree.generate_random_tree_balance(self.clone_no, self.max_tree_depth)
+        root = random_tree.generate_tree_beta(cell_num=self.cell_no, num_clones=self.clone_no, alpha=self.tree_alpha, beta=self.tree_beta, treedepth=self.max_tree_depth, treedepthsigma=self.tree_depth_sigma, max_children=self.max_node_children, balance_factor=self.tree_balance_factor, seed=self.tree_seed)
 
         self.log('Writing tree to file with newick format...', level='PROGRESS')
         result = random_tree.tree_to_newick(root)
@@ -1578,6 +1747,7 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('gprofile BYEBYE')
     
+    @utils.log_runtime
     def gfasta(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1638,24 +1808,28 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('gfasta BYEBYE')
 
+    @utils.log_runtime
     def gfastq(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
 
         tree_json = os.path.join(dprofile, 'tree.json')
+        ref_file = os.path.join(dprofile, 'reference.csv')
     
         utils.check_exist(tree_json=tree_json)
-        
+        utils.check_exist(reference_csv=ref_file)
+
         # load object from file
         root = random_tree.load_tree_from_file(tree_json)
         all_clones = random_tree.collect_all_nodes(root, 1)
+        ref = pd.read_csv(ref_file)
 
         jobs = []
         # check fasta file for each clone
         for clone in all_clones:
             utils.check_exist(maternal_fasta=clone.maternal_fasta)
             utils.check_exist(paternal_fasta=clone.paternal_fasta)
-            jobs.append((clone, dfastq))
+            jobs.append((clone, ref, dfastq))
 
         # set parallel jobs for each clone
         lock = Lock()
@@ -1673,6 +1847,7 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('gfastq BYEBYE')
 
+    @utils.log_runtime
     def align(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1714,6 +1889,7 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('align BYEBYE')
     
+    @utils.log_runtime
     def downsam(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1770,6 +1946,7 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('downsam BYEBYE')
 
+    @utils.log_runtime
     def pbam(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1802,6 +1979,8 @@ class HCDSIM:
         pool.join()
 
         self.log('pbam BYEBYE')
+    
+    @utils.log_runtime
     def bcbam(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1815,6 +1994,7 @@ class HCDSIM:
 
         self.log('bcbam BYEBYE')
 
+    @utils.log_runtime
     def rdr(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
@@ -1876,6 +2056,7 @@ class HCDSIM:
 
         self.log('RDR BYEBYE')
     
+    @utils.log_runtime
     def baf(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()

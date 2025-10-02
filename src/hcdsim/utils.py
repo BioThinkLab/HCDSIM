@@ -7,6 +7,13 @@ import pandas as pd
 import numbers
 from collections import defaultdict
 
+import numpy as np
+import pandas as pd
+from scipy.stats import beta
+from scipy.optimize import newton_krylov, NoConvergence
+import time
+import functools
+
 # check part
 def check_exist(**params):
     """Check that files are exist as expected
@@ -592,3 +599,111 @@ def create_allele_count_matrices(count_files, phased_snps_filtered, a_allele_bed
     b_allele_df = b_allele_df.loc[sorted(b_allele_df.index, key=sort_key)]
     
     return a_allele_df, b_allele_df
+
+def get_alpha_beta(x0, y0):
+    """Estimating alpha/beta from a point on the Lorenz curve."""
+    def F(P):
+        Aa, Bb = P[0], P[1]
+        X = beta.cdf(float(Aa)/(Aa+Bb), Aa, Bb) - x0
+        Y = beta.cdf(float(Aa)/(Aa+Bb), Aa+1, Bb) - y0
+        return [X, Y]
+    
+    guess = [10, 5]
+    max_n = 1000
+    n = 1
+    sol = None
+    while n < max_n:
+        try:
+            sol = newton_krylov(F, guess, method='lgmres', verbose=0, rdiff=0.1, maxiter=50)
+            break
+        except (NoConvergence, ValueError):
+            guess = np.random.rand(2) * 10 + 0.1
+        n += 1
+    
+    if sol is None:
+        print("Warning: Newton-Krylov failed to converge. Using default [1.38, 1.38].")
+        return [1.38, 1.38]
+    else:
+        return sol
+
+def bezier_coef(points):
+    n = len(points) - 1
+    C = 4 * np.identity(n)
+    np.fill_diagonal(C[1:], 1)
+    np.fill_diagonal(C[:, 1:], 1)
+    C[0, 0] = 2
+    C[n - 1, n - 1] = 7
+    C[n - 1, n - 2] = 2
+    P = [2 * (2 * points[i] + points[i + 1]) for i in range(n)]
+    P[0] = points[0] + 2 * points[1]
+    P[n - 1] = 8 * points[n - 1] + points[n]
+    A = np.linalg.solve(C, P)
+    B = [0] * n
+    for i in range(n - 1):
+        B[i] = 2 * points[i + 1] - A[i + 1]
+    B[n - 1] = (A[n - 1] + points[n]) / 2
+    return A, B
+
+def single_cubic_bezier(a, b, c, d):
+    return lambda t: np.power(1 - t, 3) * a + 3 * np.power(1 - t, 2) * t * b + 3 * (1 - t) * np.power(t, 2) * c + np.power(t, 3) * d
+
+def gen_start_interval(num_windows, interval, Aa, Bb):
+    x = list(range(0, num_windows, interval))
+    if not x or x[-1] != num_windows - 1:
+        x.append(num_windows - 1)
+    y = list(np.random.beta(Aa, Bb, len(x)))
+    return [np.array(p) for p in zip(x, y)]
+
+def gen_coverage(num_windows, interval, Aa, Bb):
+    """Generates a smoothed coverage scaler list for a series of windows."""
+    if num_windows == 0:
+        return []
+    points = gen_start_interval(num_windows, interval, Aa, Bb)
+    if len(points) < 2:
+        return [2 * max(min(p[1], 1), 0) for p in points]
+
+    A, B = bezier_coef(points)
+    curves = [single_cubic_bezier(points[i], A[i], B[i], points[i + 1]) for i in range(len(points) - 1)]
+    
+    new_points = []
+    for i in range(len(points) - 1):
+        f = curves[i]
+        start_idx, end_idx = int(points[i][0]), int(points[i+1][0])
+        gaps = end_idx - start_idx + 1
+        coords = [f(t) for t in np.linspace(0, 1, gaps)]
+        if i == 0:
+            new_points.append(coords[0][1])
+        new_points.extend([c[1] for c in coords[1:]])
+        
+    return [2 * max(min(val, 1), 0) for val in new_points]
+
+def log_runtime(func):
+    """A decorator to log and print the execution time of a member method."""
+    @functools.wraps(func)
+    def wrapper(self, *args, **kwargs):
+        # Check if the instance has a 'log' method for robustness.
+        if not hasattr(self, 'log'):
+            print(f"Warning: {type(self).__name__} instance is missing a 'log' method. Cannot log runtime.")
+            return func(self, *args, **kwargs)
+
+        func_name = func.__name__
+        self.log(f"Starting method: {func_name}...", level='PROGRESS')
+        
+        # 1. Record the start time
+        start_time = time.perf_counter()
+        
+        # 2. Execute the original function
+        # *args and **kwargs ensure that any arguments are passed correctly.
+        result = func(self, *args, **kwargs)
+        
+        # 3. Record the end time
+        end_time = time.perf_counter()
+        
+        # 4. Calculate the runtime
+        runtime = end_time - start_time
+        
+        # 5. Log using self.log
+        self.log(f"Method '{func_name}' finished, runtime: {runtime:.4f} seconds.", level='INFO')
+        
+        return result
+    return wrapper
