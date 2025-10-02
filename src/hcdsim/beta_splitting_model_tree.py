@@ -774,5 +774,41 @@ def collect_all_nodes(root, mode=0):
     
     return all_nodes
 
+def update_node_in_tree(root, new_node):
+    """
+    Update a node in the tree with the same name as the new_node.
+    If a match is found, the node in the tree is updated with new_node's attributes.
+
+    :param root: The root of the tree.
+    :param new_node: The new node to update.
+    :return: The updated root of the tree.
+    """
+    def dfs(node):
+        if node.name == new_node.name:
+            # 更新现有节点的所有属性
+            node.children = new_node.children
+            node.maternal_cnvs = new_node.maternal_cnvs
+            node.paternal_cnvs = new_node.paternal_cnvs
+            node.maternal_fasta = new_node.maternal_fasta
+            node.paternal_fasta = new_node.paternal_fasta
+            node.fq1 = new_node.fq1
+            node.fq2 = new_node.fq2
+            node.fasta = new_node.fasta
+            node.maternal_fasta_length = new_node.maternal_fasta_length
+            node.paternal_fasta_length = new_node.paternal_fasta_length
+            node.parent = new_node.parent
+            node.ratio = new_node.ratio
+            node.cell_no = new_node.cell_no
+            node.depth = new_node.depth
+            node.changes = new_node.changes
+            return True
+        for child in node.children:
+            if dfs(child):
+                return True
+        return False
+
+    dfs(root)
+    return root
+
 if __name__ == "__main__":
     main()
