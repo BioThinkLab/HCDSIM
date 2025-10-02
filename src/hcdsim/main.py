@@ -78,6 +78,7 @@ class HCDSIM:
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
                 lorenz_y: float = 0.4,
+                max_ploidy: int = None,
                 wgsim: str = 'wgsim', 
                 samtools: str = 'samtools', 
                 bwa: str = 'bwa', 
@@ -640,6 +641,7 @@ class HCDSIM:
         # add the children of normal clone to queue
         queue = deque(root.children)
 
+        max_ploidy_flag = False
         while  queue:
             clone = queue.popleft()
             clone.maternal_cnvs = []
@@ -681,8 +683,13 @@ class HCDSIM:
                     # handle WGD
                     if current_chrom in wgd_chroms:
                         if not wgd_cnvs[current_chrom]:
-                            m_cnv = utils.random_WGD()
-                            p_cnv = utils.random_WGD()
+                            if self.max_ploidy and not max_ploidy_flag:
+                                m_cnv = self.max_ploidy
+                                p_cnv = self.max_ploidy
+                                max_ploidy_flag = True
+                            else:
+                                m_cnv = utils.random_WGD()
+                                p_cnv = utils.random_WGD()
                             wgd_cnvs[current_chrom] = [m_cnv, p_cnv]
                             # 1. WGD in maternal and paternal 2. WGD in maternal 3. WGD in paternal
                             random_prob = random.random()
