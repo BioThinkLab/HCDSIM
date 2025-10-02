@@ -1357,7 +1357,7 @@ class HCDSIM:
         (clone, chrom_ref_df, outdir) = job
         gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name))
         
-        temp_dir = os.path.join(self.outdir, 'temp', clone.name)
+        temp_dir = os.path.join(self.outdir, 'tmp', clone.name)
         os.makedirs(temp_dir, exist_ok=True)
 
         # 定义最终的母本和父本FASTQ文件名
@@ -1371,10 +1371,10 @@ class HCDSIM:
             open(f, 'w').close()
 
         Aa, Bb = utils.get_alpha_beta(self.lorenz_x, self.lorenz_y)
-        self.log(f"  > Lorenz curve parameters for {clone.name}: Alpha={Aa:.2f}, Beta={Bb:.2f}")
+        # self.log(f"  > Lorenz curve parameters for {clone.name}: Alpha={Aa:.2f}, Beta={Bb:.2f}")
 
         for chrom in sorted(chrom_ref_df['Chromosome'].unique()):
-            self.log(f"  > Processing chromosome {chrom}...")
+            # self.log(f"  > Processing chromosome {chrom}...")
             chrom_bins_df = chrom_ref_df[chrom_ref_df['Chromosome'] == chrom].reset_index(drop=True)
             num_windows = len(chrom_bins_df)
             
@@ -1382,7 +1382,7 @@ class HCDSIM:
             cov_scalers = utils.gen_coverage(num_windows=num_windows, interval=interval, Aa=Aa, Bb=Bb)
 
             if len(cov_scalers) != num_windows:
-                print(f"    ! Warning: Scaler length mismatch on {chrom}. Got {len(cov_scalers)}, expected {num_windows}. Skipping chrom.")
+                self.log(f"    ! Warning: Scaler length mismatch on {chrom}. Got {len(cov_scalers)}, expected {num_windows}. Skipping chrom.", level='WARN')
                 continue
 
             for index, row in chrom_bins_df.iterrows():
@@ -1411,10 +1411,9 @@ class HCDSIM:
                     temp_fq1 = os.path.join(temp_dir, "m_r1.fq")
                     temp_fq2 = os.path.join(temp_dir, "m_r2.fq")
                     
-                    with open(region_fasta, 'w') as f_out:
-                        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-                        comand = ' '.join(['samtools', 'faidx', clone.maternal_fasta, region_str])
-                        utils.runcmd(comand, samtools_log)
+                    samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+                    command = f"{self.samtools} faidx {clone.maternal_fasta} {region_str} > {region_fasta}"
+                    utils.runcmd(command, samtools_log)
                     
                     self._run_wgsim_for_region(m_pe_reads, region_fasta, temp_fq1, temp_fq2)
                     
@@ -1427,10 +1426,9 @@ class HCDSIM:
                     temp_fq1 = os.path.join(temp_dir, "p_r1.fq")
                     temp_fq2 = os.path.join(temp_dir, "p_r2.fq")
 
-                    with open(region_fasta, 'w') as f_out:
-                        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-                        command = ' '.join(['samtools', 'faidx', clone.paternal_fasta, region_str])
-                        utils.runcmd(command, samtools_log)
+                    samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+                    command = f"{self.samtools} faidx {clone.paternal_fasta} {region_str} > {region_fasta}"
+                    utils.runcmd(command, samtools_log)
                     
                     self._run_wgsim_for_region(p_pe_reads, region_fasta, temp_fq1, temp_fq2)
                     
