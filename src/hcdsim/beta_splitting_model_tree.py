@@ -24,8 +24,8 @@ class TreeNode:
     def __init__(self, name):
         self.name = name
         self.children = []
-        self.maternal_cnvs = []
-        self.paternal_cnvs = []
+        self.maternal_cnas = []
+        self.paternal_cnas = []
         self.maternal_fasta = None
         self.paternal_fasta = None
         self.fq1 = None
@@ -41,14 +41,15 @@ class TreeNode:
         self.id = None
         self.edge_length = 0
         self.interval = None  # Store the interval as [start, end]
+        self.cna_status = None
 
     def to_dict(self):
         """Convert the TreeNode and its children to a dictionary."""
         return {
             "name": self.name,
             "children": [child.to_dict() for child in self.children],
-            "maternal_cnvs": self.maternal_cnvs,
-            "paternal_cnvs": self.paternal_cnvs,
+            "maternal_cnas": self.maternal_cnas,
+            "paternal_cnas": self.paternal_cnas,
             "maternal_fasta": self.maternal_fasta,
             "paternal_fasta": self.paternal_fasta,
             "fq1": self.fq1,
@@ -62,15 +63,16 @@ class TreeNode:
             "changes": self.changes,
             "id": self.id,
             "edge_length": self.edge_length,
-            "interval": self.interval
+            "interval": self.interval,
+            "cna_status": self.cna_status
         }
 
     @staticmethod
     def from_dict(data, parent=None):
         """Restore a TreeNode from a dictionary, setting parent references."""
         node = TreeNode(data["name"])
-        node.maternal_cnvs = data.get("maternal_cnvs", [])
-        node.paternal_cnvs = data.get("paternal_cnvs", [])
+        node.maternal_cnas = data.get("maternal_cnas", [])
+        node.paternal_cnas = data.get("paternal_cnas", [])
         node.maternal_fasta = data.get("maternal_fasta", None)
         node.paternal_fasta = data.get("paternal_fasta", None)
         node.fq1 = data.get("fq1", None)
@@ -787,8 +789,8 @@ def update_node_in_tree(root, new_node):
         if node.name == new_node.name:
             # 更新现有节点的所有属性
             node.children = new_node.children
-            node.maternal_cnvs = new_node.maternal_cnvs
-            node.paternal_cnvs = new_node.paternal_cnvs
+            node.maternal_cnas = new_node.maternal_cnas
+            node.paternal_cnas = new_node.paternal_cnas
             node.maternal_fasta = new_node.maternal_fasta
             node.paternal_fasta = new_node.paternal_fasta
             node.fq1 = new_node.fq1

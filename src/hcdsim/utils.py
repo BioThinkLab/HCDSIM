@@ -147,7 +147,7 @@ def parseIgnoreList(ignorefile):
                 ignorelist.append(line.strip())
     return ignorelist
 
-def random_cnv():
+def random_cna():
     # 定义数字和对应的概率e
     numbers = [0, 2, 3, 4, 5]
     probabilities = [0.2, 0.3, 0.25, 0.15, 0.1]
@@ -155,7 +155,7 @@ def random_cnv():
     # 使用choices函数进行随机选择，weights参数指定概率
     return random.choices(numbers, weights=probabilities)[0]
 
-def random_mirrored_cnv():
+def random_mirrored_cna():
     # 定义数字和对应的概率e
     numbers = [2, 3, 4, 5, 6, 7, 8, 9]
     probabilities = [0.05, 0.2, 0.3, 0.2, 0.1, 0.05, 0.05, 0.05]
@@ -707,3 +707,12 @@ def log_runtime(func):
         
         return result
     return wrapper
+
+def generate_mixture_poisson():
+    """Generate a random sample from a mixture of Poisson distributions with specified weights and lambda parameters.
+    """
+    weights = [0.3, 0.4, 0.2, 0.1]
+    lambdas = [5, 20, 100, 300]
+    component = np.random.choice(len(lambdas), p=weights)
+    sample = np.random.poisson(lambdas[component])
+    return sample
