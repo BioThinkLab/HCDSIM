@@ -1216,8 +1216,6 @@ class HCDSIM:
 
     def _generate_cna_profile_for_each_clone(self, root, ref, m_fasta, p_fasta):
         all_chroms = ref['Chromosome'].unique().tolist()
-        if self.wgd_cna_no + self.wcl_cna_no > len(all_chroms):
-            raise Exception("The sum of wgd_cna_no and wcl_cna_no should be less or equal to the total number of chromosomes!")
 
         # store maternal and paternal genome to dict
         maternal_genome = {}
