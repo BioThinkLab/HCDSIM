@@ -714,5 +714,17 @@ def generate_mixture_poisson():
     weights = [0.3, 0.4, 0.2, 0.1]
     lambdas = [5, 20, 100, 300]
     component = np.random.choice(len(lambdas), p=weights)
-    sample = np.random.poisson(lambdas[component])
+    sample = max(1, np.random.poisson(lambdas[component]))
     return sample
+
+def set_random_seed(seed):
+    """Set random seed for reproducibility."""
+    if seed is None:
+        # If no seed provided, generate a random one and save it
+        seed = int.from_bytes(os.urandom(4), byteorder="little")
+    
+    # Set seeds for both random and numpy
+    random.seed(seed)
+    np.random.seed(seed)
+    
+    return seed

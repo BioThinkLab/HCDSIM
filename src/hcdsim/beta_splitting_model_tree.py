@@ -552,8 +552,8 @@ def assign_cells_to_all_nodes(root, cell_num):
     
     return root
 
-def generate_tree_beta(cell_num=10000, num_clones=10, alpha=10.0, beta=10.0, treedepth=4, 
-                      treedepthsigma=0.5, max_children=4, balance_factor=0.8, seed=None):
+def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, treedepth=4, 
+                      treedepthsigma=0.5, max_children=4, balance_factor=0.8):
     """
     Generate a random tree using the modified Beta Splitting Model with multifurcation.
     
@@ -572,8 +572,8 @@ def generate_tree_beta(cell_num=10000, num_clones=10, alpha=10.0, beta=10.0, tre
     - Root node of the generated tree
     """
     # Set random seed if provided
-    if seed is not None:
-        set_random_seed(seed)
+    # if seed is not None:
+    #     set_random_seed(seed)
     
     # Maximum attempts to generate a tree with the right parameters
     max_attempts = 10
