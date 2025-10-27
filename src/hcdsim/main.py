@@ -1288,7 +1288,7 @@ class HCDSIM:
                             clone.name,
                             'maternal',
                             'WGD',
-                            f"{chrom}:{chrom_start}-{chrom_end}",chrom_end - chrom_start + 1,
+                            f"{chrom}:{chrom_start}-{chrom_end}", str(chrom_end - chrom_start + 1),
                             f'1->{cna_copies}'
                         ])
                         clone.changes.append([
@@ -1296,7 +1296,7 @@ class HCDSIM:
                             clone.name,
                             'paternal',
                             'WGD',
-                            f"{chrom}:{chrom_start}-{chrom_end}",chrom_end - chrom_start + 1,
+                            f"{chrom}:{chrom_start}-{chrom_end}",str(chrom_end - chrom_start + 1),
                             f'1->{cna_copies}'
                         ])
                     
@@ -1500,14 +1500,14 @@ class HCDSIM:
                             if m_cna == 0:
                                 clone.changes.append([
                                     'normal', clone.name, 'maternal', 'CNL_LOH',
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'1->{m_cna}'
                                 ])
                             
                             if p_cna == 0:
                                 clone.changes.append([
                                     'normal', clone.name, 'paternal', 'CNL_LOH',
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'1->{p_cna}'
                                 ])
                 
@@ -1532,13 +1532,13 @@ class HCDSIM:
                             
                             clone.changes.append([
                                 'normal', clone.name, 'maternal', event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{m_cna}'
                             ])
 
                             clone.changes.append([
                                 'normal', clone.name, 'paternal', event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{p_cna}'
                             ])
                     
@@ -1561,12 +1561,12 @@ class HCDSIM:
                             
                             clone.changes.append([
                                 'normal', clone.name, 'maternal', 'GOH',
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{m_cna}'
                             ])
                             clone.changes.append([
                                 'normal', clone.name, 'paternal', 'GOH',
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{p_cna}'
                             ])
                             
@@ -1609,7 +1609,7 @@ class HCDSIM:
                             m_event_type = 'ARM_DEL' if m_cna == 0 else 'ARM_DUP'
                             clone.changes.append([
                                 'normal', clone.name, 'maternal', m_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{m_cna}'
                             ])
                         
@@ -1618,7 +1618,7 @@ class HCDSIM:
                             p_event_type = 'ARM_DEL' if p_cna == 0 else 'ARM_DUP'
                             clone.changes.append([
                                 'normal', clone.name, 'paternal', p_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{p_cna}'
                             ])
                     
@@ -1661,7 +1661,7 @@ class HCDSIM:
                             m_event_type = 'WCL' if m_cna == 0 else 'WCD'
                             clone.changes.append([
                                 'normal', clone.name, 'maternal', m_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{m_cna}'
                             ])
                         
@@ -1670,7 +1670,7 @@ class HCDSIM:
                             p_event_type = 'WCL' if p_cna == 0 else 'WCD'
                             clone.changes.append([
                                 'normal', clone.name, 'paternal', p_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{p_cna}'
                             ])
                     
@@ -1719,13 +1719,13 @@ class HCDSIM:
                             if m_cna != 1:
                                 clone.changes.append([
                                     'normal', clone.name, 'maternal', p_event_type,
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'1->{m_cna}'
                                 ])
                             if p_cna != 1:
                                 clone.changes.append([
                                     'normal', clone.name, 'paternal', p_event_type,
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'1->{p_cna}'
                                 ])
                             continue
@@ -1735,7 +1735,7 @@ class HCDSIM:
                             m_event_type = 'DEL' if m_cna == 0 else 'DUP'
                             clone.changes.append([
                                 'normal', clone.name, 'maternal', m_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{m_cna}'
                             ])
                         
@@ -1744,7 +1744,7 @@ class HCDSIM:
                             p_event_type = 'DEL' if p_cna == 0 else 'DUP'
                             clone.changes.append([
                                 'normal', clone.name, 'paternal', p_event_type,
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                 f'1->{p_cna}'
                             ])
                     i += 1
@@ -1827,14 +1827,14 @@ class HCDSIM:
                                 if new_m_cna != parent_m_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'maternal', 'POST_WGD_DUP',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{new_m_cna}'
                                     ])
                                 
                                 if new_p_cna != parent_p_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'paternal', 'POST_WGD_DUP',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{new_p_cna}'
                                     ])
                                 
@@ -2010,14 +2010,14 @@ class HCDSIM:
                                 if m_cna != parent_m_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'maternal', 'CNL_LOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{m_cna}'
                                     ])
                                 
                                 if p_cna != parent_p_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'paternal', 'CNL_LOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{p_cna}'
                                     ])
                         
@@ -2042,13 +2042,13 @@ class HCDSIM:
                                 
                                 clone.changes.append([
                                     parent.name, clone.name, 'maternal', event_type,
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'{parent_m_cna}->{m_cna}'
                                 ])
                                 
                                 clone.changes.append([
                                     parent.name, clone.name, 'paternal', event_type,
-                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                    f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                     f'{parent_p_cna}->{p_cna}'
                                 ])
                         
@@ -2076,14 +2076,14 @@ class HCDSIM:
                                 if m_cna != parent_m_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'maternal', 'GOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{m_cna}'
                                     ])
                                 
                                 if p_cna != parent_p_cna:
                                     clone.changes.append([
                                         parent.name, clone.name, 'paternal', 'GOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{p_cna}'
                                     ])
                         
@@ -2132,13 +2132,13 @@ class HCDSIM:
                                 if m_cna != 1:
                                     clone.changes.append([
                                         'normal', clone.name, 'maternal', p_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{m_cna}'
                                     ])
                                 if p_cna != 1:
                                     clone.changes.append([
                                         'normal', clone.name, 'paternal', p_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{p_cna}'
                                     ])
                                 continue
@@ -2148,7 +2148,7 @@ class HCDSIM:
                                     m_event_type = 'DEL' if m_cna == 0 else 'DUP'
                                     clone.changes.append([
                                         parent.name, clone.name, 'maternal', m_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{m_cna}'
                                     ])
                                 
@@ -2157,7 +2157,7 @@ class HCDSIM:
                                     p_event_type = 'DEL' if p_cna == 0 else 'DUP'
                                     clone.changes.append([
                                         parent.name, clone.name, 'paternal', p_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",event_end_pos-event_start_pos + 1,
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{p_cna}'
                                     ])
                         
@@ -2349,7 +2349,7 @@ class HCDSIM:
                                     cell_changes.append([
                                         clone.name, cell_id, 'maternal', loh_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        event_end_pos-event_start_pos + 1,
+                                        str(event_end_pos-event_start_pos + 1),
                                         f'1->{m_cna}'
                                     ])
                                 
@@ -2357,7 +2357,7 @@ class HCDSIM:
                                     cell_changes.append([
                                         clone.name, cell_id, 'paternal', loh_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        event_end_pos-event_start_pos + 1,
+                                        str(event_end_pos-event_start_pos + 1),
                                         f'1->{p_cna}'
                                     ])
                             else:
@@ -2367,7 +2367,7 @@ class HCDSIM:
                                     cell_changes.append([
                                         clone.name, cell_id, 'maternal', m_event_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        event_end_pos-event_start_pos + 1,
+                                        str(event_end_pos-event_start_pos + 1),
                                         f'1->{m_cna}'
                                     ])
                                 
@@ -2376,7 +2376,7 @@ class HCDSIM:
                                     cell_changes.append([
                                         clone.name, cell_id, 'paternal', p_event_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        event_end_pos-event_start_pos + 1,
+                                        str(event_end_pos-event_start_pos + 1),
                                         f'1->{p_cna}'
                                     ])
                             
