@@ -621,8 +621,21 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, tree
 
 def save_tree_to_file(root, filename):
     """Save the tree to a file in JSON format."""
+    def convert_int64(obj):
+        """递归转换所有 int64 为 int"""
+        if isinstance(obj, np.int64):
+            return int(obj)
+        elif isinstance(obj, dict):
+            return {key: convert_int64(value) for key, value in obj.items()}
+        elif isinstance(obj, list):
+            return [convert_int64(item) for item in obj]
+        return obj
+    
+    tree_dict = root.to_dict()
+    tree_dict = convert_int64(tree_dict)
+    
     with open(filename, "w") as file:
-        json.dump(root.to_dict(), file, indent=4)
+        json.dump(tree_dict, file, indent=4)
 
 def load_tree_from_file(filename):
     """Load the tree from a JSON file."""
