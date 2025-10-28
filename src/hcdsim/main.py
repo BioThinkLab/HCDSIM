@@ -64,7 +64,8 @@ class HCDSIM:
                 snp_ratio: float = 0.001, 
                 thread: int = None, 
                 heho_ratio: float = 0.67, 
-                cna_prob: float = 0.2,
+                cna_prob: float = 0.02,
+                del_prob: float = 0.2,
                 cna_copy_param: float = 0.5,
                 clone_coverage: float = 30, 
                 cell_coverage: float = 0.5, 
@@ -82,6 +83,7 @@ class HCDSIM:
                 lorenz_x: float = 0.5,
                 lorenz_y: float = 0.4,
                 max_ploidy: int = None,
+                max_cna_value: int = 10,
                 wgsim: str = 'wgsim', 
                 samtools: str = 'samtools', 
                 bwa: str = 'bwa', 
@@ -1270,7 +1272,7 @@ class HCDSIM:
                     if self.max_ploidy:
                         cna_copies = self.max_ploidy
                     else:
-                        cna_copies = max(2, np.random.geometric(self.cna_copy_param))
+                        cna_copies = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)
                     
                     for i in range(total_bin_lens):
                         clone.cna_status[i] = 'wgd'
@@ -1515,7 +1517,7 @@ class HCDSIM:
                     elif cna_type == "cnn":
                         if m_sequence != p_sequence:
                             # CNN_LOH: 2:0 or 0:2
-                            cnn_cna = max(2, np.random.geometric(self.cna_copy_param))
+                            cnn_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)
                             
                             if np.random.binomial(1, 0.5):  # Maternal duplication, paternal deletion
                                 m_cna = cnn_cna
@@ -1546,14 +1548,14 @@ class HCDSIM:
                     elif cna_type == "goh":
                         if m_sequence == p_sequence:
                             # GOH: Both alleles gain, but with different copy numbers
-                            m_cna = np.random.geometric(self.cna_copy_param)
-                            p_cna = np.random.geometric(self.cna_copy_param)
+                            m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
+                            p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             # Ensure at least one is greater than 1
                             while m_cna <= 1 and p_cna <= 1:
                                 if np.random.binomial(1, 0.5):
-                                    m_cna = np.random.geometric(self.cna_copy_param)
+                                    m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
                                 else:
-                                    p_cna = np.random.geometric(self.cna_copy_param)
+                                    p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             for bin_idx in event_bins:
                                 clone.maternal_cnas[bin_idx] = m_cna
@@ -1573,32 +1575,32 @@ class HCDSIM:
                     # Handle chromosome arm-level CNA
                     elif cna_type == "chrom-arm-cna":
                         # Generate maternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             m_cna = 0
                         else:  # Duplication
-                            m_cna = np.random.geometric(self.cna_copy_param)
+                            m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
 
                         # Generate paternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             p_cna = 0
                         else:  # Duplication
-                            p_cna = np.random.geometric(self.cna_copy_param)
+                            p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
 
                         # Ensure at least one allele has mutated (not both equal to 1)
                         if m_cna == 1 and p_cna == 1:
                             # Force at least one to mutate
                             if np.random.binomial(1, 0.5):
                                 # Mutate maternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     m_cna = 0  # Delete maternal
                                 else:
-                                    m_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate maternal
+                                    m_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate maternal
                             else:
                                 # Mutate paternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     p_cna = 0  # Delete paternal
                                 else:
-                                    p_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate paternal
+                                    p_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value) # Duplicate paternal
                         
                         for bin_idx in event_bins:
                             clone.maternal_cnas[bin_idx] = m_cna
@@ -1625,13 +1627,13 @@ class HCDSIM:
                     # Handle whole chromosome-level CNA
                     elif cna_type == "whole-chrom-cna":
                         # Generate maternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.cna_prob):  # Deletion
                             m_cna = 0
                         else:  # Duplication
                             m_cna = np.random.geometric(self.cna_copy_param)
 
                         # Generate paternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.cna_prob):  # Deletion
                             p_cna = 0
                         else:  # Duplication
                             p_cna = np.random.geometric(self.cna_copy_param)
@@ -1641,16 +1643,16 @@ class HCDSIM:
                             # Force at least one to mutate
                             if np.random.binomial(1, 0.5):
                                 # Mutate maternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     m_cna = 0  # Delete maternal
                                 else:
-                                    m_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate maternal
+                                    m_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate maternal
                             else:
                                 # Mutate paternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     p_cna = 0  # Delete paternal
                                 else:
-                                    p_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate paternal
+                                    p_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate paternal
                         
                         for bin_idx in event_bins:
                             clone.maternal_cnas[bin_idx] = m_cna
@@ -1677,32 +1679,32 @@ class HCDSIM:
                     # Handle regular CNA
                     elif cna_type == "cna":
                         # Generate maternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             m_cna = 0
                         else:  # Duplication
-                            m_cna = np.random.geometric(self.cna_copy_param)
+                            m_cna = min(np.random.geometric(self.cna_copy_param), 10)
 
                         # Generate paternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, 0.5):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             p_cna = 0
                         else:  # Duplication
-                            p_cna = np.random.geometric(self.cna_copy_param)
+                            p_cna = min(np.random.geometric(self.cna_copy_param), 10)
 
                         # Ensure at least one allele has mutated (not both equal to 1)
                         if m_cna == 1 and p_cna == 1:
                             # Force at least one to mutate
                             if np.random.binomial(1, 0.5):
                                 # Mutate maternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     m_cna = 0  # Delete maternal
                                 else:
-                                    m_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate maternal
+                                    m_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate maternal
                             else:
                                 # Mutate paternal
-                                if np.random.binomial(1, 0.5):
+                                if np.random.binomial(1, self.del_prob):
                                     p_cna = 0  # Delete paternal
                                 else:
-                                    p_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate paternal
+                                    p_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value) # Duplicate paternal
                         
                         for bin_idx in event_bins:
                             clone.maternal_cnas[bin_idx] = m_cna
@@ -1767,7 +1769,7 @@ class HCDSIM:
                 if parent_is_wgd:
                     # Randomly select positions for new CNAs with probability
                     for i in range(total_bin_lens):
-                        if np.random.binomial(1, self.cna_prob * 0.5):  # Reduced probability for post-WGD mutations
+                        if np.random.binomial(1, self.cna_prob * 0.1):  # Reduced probability for post-WGD mutations
                             num_windows_span = utils.generate_mixture_poisson()
                             
                             # Get chromosome of the start position
@@ -1800,14 +1802,14 @@ class HCDSIM:
                                 mutation_choice = np.random.choice(['maternal', 'paternal', 'both'])
                                 
                                 if mutation_choice == 'maternal':
-                                    new_m_cna = parent_m_cna + np.random.geometric(self.cna_copy_param)
+                                    new_m_cna = min(parent_m_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                                     new_p_cna = parent_p_cna
                                 elif mutation_choice == 'paternal':
                                     new_m_cna = parent_m_cna
-                                    new_p_cna = parent_p_cna + np.random.geometric(self.cna_copy_param)
+                                    new_p_cna = min(parent_p_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                                 else:  # both
-                                    new_m_cna = parent_m_cna + np.random.geometric(self.cna_copy_param)
-                                    new_p_cna = parent_p_cna + np.random.geometric(self.cna_copy_param)
+                                    new_m_cna = min(parent_m_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
+                                    new_p_cna = min(parent_p_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                                 
                                 # Apply the mutation to all bins in this span
                                 event_bins = []
@@ -2025,7 +2027,7 @@ class HCDSIM:
                         elif cna_type == "cnn":
                             if m_sequence != p_sequence:
                                 # CNN_LOH: duplication of one allele, deletion of the other
-                                cnn_cna = max(2, np.random.geometric(self.cna_copy_param))
+                                cnn_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)
                                 
                                 if np.random.binomial(1, 0.5):  # Maternal duplication, paternal deletion
                                     m_cna = cnn_cna  # Add copies to maintain or increase
@@ -2066,8 +2068,8 @@ class HCDSIM:
                                     else:
                                         p_add = np.random.geometric(self.cna_copy_param)
                                 
-                                m_cna = parent_m_cna + m_add
-                                p_cna = parent_p_cna + p_add
+                                m_cna = min(parent_m_cna + m_add, self.max_cna_value)
+                                p_cna = min(parent_p_cna + p_add, self.max_cna_value)
                                 
                                 for bin_idx in event_bins:
                                     clone.maternal_cnas[bin_idx] = m_cna
@@ -2090,31 +2092,31 @@ class HCDSIM:
                         # Handle regular CNA
                         elif cna_type == "cna":
                             # Generate maternal CNA
-                            if np.random.binomial(1, 0.5):  # Deletion
+                            if np.random.binomial(1, self.del_prob):  # Deletion
                                 m_cna = 0
                             else:  # Duplication
-                                m_cna = parent_m_cna + np.random.geometric(self.cna_copy_param)
+                                m_cna = min(parent_m_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             # Generate paternal CNA
                             if np.random.binomial(1, 0.5):  # Deletion
                                 p_cna = 0
                             else:  # Duplication
-                                p_cna = parent_p_cna + np.random.geometric(self.cna_copy_param)
+                                p_cna = min(parent_p_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             # Ensure at least one allele has mutated
                             if m_cna == parent_m_cna and p_cna == parent_p_cna:
                                 if np.random.binomial(1, 0.5):
                                     # Mutate maternal
-                                    if np.random.binomial(1, 0.5):
+                                    if np.random.binomial(1, self.del_prob):
                                         m_cna = 0
                                     else:
-                                        m_cna = parent_m_cna + max(1, np.random.geometric(self.cna_copy_param))
+                                        m_cna = min(parent_m_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                                 else:
                                     # Mutate paternal
                                     if np.random.binomial(1, 0.5):
                                         p_cna = 0
                                     else:
-                                        p_cna = parent_p_cna + max(1, np.random.geometric(self.cna_copy_param))
+                                        p_cna = min(parent_p_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             for bin_idx in event_bins:
                                 clone.maternal_cnas[bin_idx] = m_cna
@@ -2252,7 +2254,11 @@ class HCDSIM:
                     start_idx = available_indices[i]
                     
                     # Decide whether to place a CNA here
-                    if np.random.binomial(1, self.cna_prob * 0.1):
+                    if clone.name == 'normal':
+                        temp_prob = np.random.binomial(1, self.cna_prob * 0.02)
+                    else:
+                        temp_prob = np.random.binomial(1, self.cna_prob * 0.1)
+                    if temp_prob:
                         num_windows_span = utils.generate_mixture_poisson()
                         
                         # Check if we can place a CNA spanning num_windows_span bins
@@ -2280,31 +2286,31 @@ class HCDSIM:
                                 cell_cna_status[idx] = ("cna", num_windows_span, cna_event_id)
                             
                             # Generate maternal CNA: deletion or duplication
-                            if np.random.binomial(1, 0.5):  # Deletion
+                            if np.random.binomial(1, self.del_prob):  # Deletion
                                 m_cna = 0
                             else:  # Duplication
-                                m_cna = np.random.geometric(self.cna_copy_param)
+                                m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             # Generate paternal CNA: deletion or duplication
-                            if np.random.binomial(1, 0.5):  # Deletion
+                            if np.random.binomial(1, self.del_prob):  # Deletion
                                 p_cna = 0
                             else:  # Duplication
-                                p_cna = np.random.geometric(self.cna_copy_param)
+                                p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value)
                             
                             # Ensure at least one allele has mutated (not both equal to 1)
                             if m_cna == 1 and p_cna == 1:
                                 if np.random.binomial(1, 0.5):
                                     # Mutate maternal
-                                    if np.random.binomial(1, 0.5):
+                                    if np.random.binomial(1, self.del_prob):
                                         m_cna = 0  # Delete maternal
                                     else:
-                                        m_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate maternal
+                                        m_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate maternal
                                 else:
                                     # Mutate paternal
-                                    if np.random.binomial(1, 0.5):
+                                    if np.random.binomial(1, self.del_prob):
                                         p_cna = 0  # Delete paternal
                                     else:
-                                        p_cna = max(2, np.random.geometric(self.cna_copy_param))  # Duplicate paternal
+                                        p_cna = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value)  # Duplicate paternal
                             
                             # Apply the CNA to all bins in the span
                             for idx in span_indices:
