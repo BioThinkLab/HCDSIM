@@ -83,7 +83,7 @@ class HCDSIM:
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
                 lorenz_y: float = 0.4,
-                window_size: int = 50000,
+                window_size: int = 200000,
                 max_ploidy: int = None,
                 max_cna_value: int = 10,
                 wgsim: str = 'wgsim', 
@@ -2751,7 +2751,11 @@ class HCDSIM:
                         with open(temp_fq2, 'r') as f:
                             for line in f:
                                 out2.write(f.read())
-
+                    # Remove temporary files
+                    if os.path.exists(temp_fq1):
+                        os.remove(temp_fq1)
+                    if os.path.exists(temp_fq2):
+                        os.remove(temp_fq2)
         self.log("Finish generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
 
     def _alignment_for_each_clone(self, job):
