@@ -781,3 +781,42 @@ def read_fasta(fasta_file):
     
     return chromosomes
 
+def find_segment_type(df, child, chromosome, bin_start, bin_end):
+    """
+    查找bin所属的segment type
+    
+    参数:
+        df: 包含segment数据的DataFrame
+        chromosome: 染色体名称，如 'chr1'
+        bin_start: bin的起始位置
+        bin_end: bin的结束位置
+        child: 克隆名称，默认'clone1'
+    
+    返回:
+        type值或None（如果未找到）
+    """
+    # 筛选对应的child
+    child_df = df[df['Child'] == child].copy()
+    
+    # 解析Segment列
+    for idx, row in child_df.iterrows():
+        segment = row['Segment']
+        
+        # 解析格式: chr1:1-248956422
+        parts = segment.split(':')
+        seg_chr = parts[0]
+        
+        if seg_chr != chromosome:
+            continue
+            
+        # 解析起止位置
+        positions = parts[1].split('-')
+        seg_start = int(positions[0])
+        seg_end = int(positions[1])
+        
+        # 检查bin是否在segment区间内
+        # bin完全在segment内，或有重叠
+        if bin_start <= seg_end and bin_end >= seg_start:
+            return row['Type']
+    
+    return None  # 未找到匹配的segment

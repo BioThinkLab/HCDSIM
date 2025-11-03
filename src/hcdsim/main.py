@@ -2382,13 +2382,7 @@ class HCDSIM:
                         end = int(row['End'])
 
                         # handle CNN_LOH
-                        segment = chrom + ':' + str(start) + '-' + str(end)
-                        # logging.info(clone.name, segment)
-                        all_types = changes[(changes['Child']==clone.name) & (changes['Segment']==segment)]['Type'].tolist()
-                        if len(all_types):
-                            cna_type = all_types[0]
-                        else:
-                            cna_type = 'REGULAR'
+                        cna_type = utils.find_segment_type(changes, clone.name, chrom, start, end)
                         m_sequence = maternal_genome[chrom][start-1:end]
                         p_sequence = paternal_genome[chrom][start-1:end]
                         # if cna_type == 'CNN_LOH':
@@ -3027,7 +3021,7 @@ class HCDSIM:
 
         tree_json = os.path.join(dprofile, 'tree.json')
         ref_file = os.path.join(dprofile, 'reference.csv')
-        changes_file = os.path.join(dprofile, 'changes.csv')
+        changes_file = os.path.join(dprofile, 'clone_changes.csv')
         maternal_fasta = os.path.join(dfasta, 'reference_maternal.fasta')
         paternal_fasta = os.path.join(dfasta, 'reference_paternal.fasta')
 
