@@ -51,6 +51,7 @@ class HCDSIM:
                 snp_list: str = None, 
                 ignore: str = None, 
                 outdir: str = './', 
+                genome_version: str = 'hg38',
                 clone_no: int = 2, 
                 cell_no: int = 2, 
                 tree_alpha: float = 10.0, 
@@ -82,6 +83,7 @@ class HCDSIM:
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
                 lorenz_y: float = 0.4,
+                window_size: int = 50000,
                 max_ploidy: int = None,
                 max_cna_value: int = 10,
                 wgsim: str = 'wgsim', 
@@ -557,52 +559,7 @@ class HCDSIM:
 
         return grouped_df
 
-    # def _split_chr_to_bins(self, chrom):
-    #     """Split chromosomes to fixed-lenght bins
-
-    #     Parameters
-    #     ----------
-    #     bin_size : int
-    #         fixed-bin-length
-
-    #     Returns
-    #     -------
-    #     ref: Dataframe of pandas
-    #     """
-    #     ref = pd.DataFrame(
-    #         columns=['Chromosome', 'Start', 'End'])
-    #     bin_size = self.bin_size
-    #     if chrom != 'all':
-    #         chrom_size = self.chrom_sizes[chrom]
-    #         start = 1
-    #         end = bin_size
-    #         count = 1
-    #         while(start < chrom_size):
-    #             ref = pd.concat([ref, pd.DataFrame([{
-    #                 'Chromosome': chrom,
-    #                 'Start': start,
-    #                 'End': min(end, chrom_size),
-    #             }])], ignore_index=True)
-    #             count += 1
-    #             start = end + 1
-    #             end = bin_size * count     
-    #     else:
-    #         for chrom, chrom_size in self.chrom_sizes.items():
-    #             start = 1
-    #             end = bin_size
-    #             count = 1
-    #             while(start < chrom_size):
-    #                 ref = pd.concat([ref, pd.DataFrame([{
-    #                     'Chromosome': chrom,
-    #                     'Start': start,
-    #                     'End': min(end, chrom_size),
-    #                 }])], ignore_index=True)
-    #                 count += 1
-    #                 start = end + 1
-    #                 end = bin_size * count            
-    #     return ref
-
-    def _split_chr_to_bins(self, chrom, genome_version='hg38'):
+    def _split_chr_to_bins(self, chrom):
         """Split chromosomes to fixed-length bins with chromosome arm annotation
 
         Parameters
@@ -616,7 +573,7 @@ class HCDSIM:
         -------
         ref: DataFrame of pandas with columns ['Chromosome', 'Start', 'End', 'Arm']
         """
-        
+        genome_version = self.genome_version
         bin_size = self.bin_size
         
         # 着丝粒位置 (hg19) - UCSC官方数据
@@ -2459,15 +2416,11 @@ class HCDSIM:
                                 else:
                                     new_m_sequence += m_sequence[pos]
                                     new_p_sequence += p_sequence[pos]
-                            # cna_m_sequence = new_m_sequence * m_cna
-                            # cna_p_sequence = new_p_sequence * p_cna
-                            cna_m_sequence = new_m_sequence
-                            cna_p_sequence = new_p_sequence
+                            cna_m_sequence = new_m_sequence * m_cna
+                            cna_p_sequence = new_p_sequence * p_cna
                         else:   
-                            # cna_m_sequence = m_sequence * m_cna
-                            # cna_p_sequence = p_sequence * p_cna
-                            cna_m_sequence = m_sequence
-                            cna_p_sequence = p_sequence
+                            cna_m_sequence = m_sequence * m_cna
+                            cna_p_sequence = p_sequence * p_cna
                         m_output.write(cna_m_sequence)
                         p_output.write(cna_p_sequence)
                         clone.maternal_fasta_length += len(cna_m_sequence)
@@ -2481,63 +2434,7 @@ class HCDSIM:
         # utils.runcmd(command, self.outdir)
         gfasta_bar.progress(advance=True, msg="Finish generating fasta file for {}".format(clone.name))
         return (clone)
-    
-    # def _find_mirrored_clones(self, cna_profile):
-    #     """
-    #     Identify rows with mirrored-clone CNAs in a given CNV CSV file, excluding cases where the 
-    #     allele-specific CNVs are equal (e.g., 1|1, 2|2).
 
-    #     Parameters:
-    #         cna profile cna
-
-    #     Returns:
-    #         pd.DataFrame: A DataFrame containing rows with mirrored-clone CNAs.
-    #     """
-    #     # Read the CSV file into a pandas DataFrame
-    #     df = cna_profile
-        
-    #     # Ensure the first three columns are Chromosome, Start, and End
-    #     required_columns = ['Chromosome', 'Start', 'End']
-    #     if not all(col in df.columns[:3] for col in required_columns):
-    #         raise ValueError("The first three columns must be 'Chromosome', 'Start', and 'End'")
-        
-    #     # Extract clone columns (columns after the first three)
-    #     clone_columns = df.columns[3:]
-        
-    #     # Prepare a list to store rows with mirrored-clone CNAs
-    #     mirrored_rows = []
-        
-    #     # Iterate through each row in the DataFrame
-    #     for _, row in df.iterrows():
-    #         # Iterate through all pairs of clone columns to check for mirrored CNAs
-    #         for i in range(len(clone_columns)):
-    #             for j in range(i + 1, len(clone_columns)):
-    #                 clone1 = row[clone_columns[i]]
-    #                 clone2 = row[clone_columns[j]]
-                    
-    #                 # Split the allele-specific CNV (e.g., "1|2") into two haplotypes
-    #                 try:
-    #                     haplotype1 = tuple(map(int, clone1.split('|')))
-    #                     haplotype2 = tuple(map(int, clone2.split('|')))
-    #                 except ValueError:
-    #                     raise ValueError(f"Invalid allele-specific CNV format in row: {row}")
-
-    #                 # Check if they are mirrored (e.g., (1, 2) and (2, 1)),
-    #                 # and exclude cases where both haplotypes are equal (e.g., (1, 1) or (2, 2))
-    #                 if haplotype1 == haplotype2[::-1] and haplotype1[0] != haplotype1[1]:
-    #                     mirrored_rows.append({
-    #                         'Chromosome': row['Chromosome'],
-    #                         'Start': row['Start'],
-    #                         'End': row['End'],
-    #                         'Clone1': clone_columns[i],
-    #                         'Clone2': clone_columns[j],
-    #                         'Clone1_CNA': clone1,
-    #                         'Clone2_CNA': clone2
-    #                     })
-        
-    #     # Convert the results into a DataFrame
-    #     mirrored_df = pd.DataFrame(mirrored_rows)
-    #     return mirrored_df
     def _find_mirrored_clones(self, cna_profile):
         """
         Identify rows with mirrored-clone CNAs in a given CNV CSV file, excluding cases where the 
@@ -2768,149 +2665,100 @@ class HCDSIM:
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
         utils.runcmd(command, wgsim_log)
 
+    def _run_wgsim_for_window(self, task):
+        """
+        Run wgsim for a single window
+        Returns the output FASTQ filenames
+        """
+        (chr_name, window_idx, window_seq, num_reads) = task
+        wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
+
+        if num_reads == 0:
+            return None
+        
+        # Create temporary files
+        temp_dir = os.path.join(self.outdir, 'tmp')
+        temp_fasta = os.path.join(temp_dir, f"window_{chr_name}_{window_idx}.fa")
+        temp_fq1 = os.path.join(temp_dir, f"reads_{chr_name}_{window_idx}_1.fq")
+        temp_fq2 = os.path.join(temp_dir, f"reads_{chr_name}_{window_idx}_2.fq")
+        
+        # Write window sequence to temp FASTA
+        utils.write_fasta(f"{chr_name}_window_{window_idx}", window_seq, temp_fasta)
+        
+        # Build wgsim command
+        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,num_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
+        utils.runcmd(command, wgsim_log)
+        if os.path.exists(temp_fasta):
+            os.remove(temp_fasta)
+        return (temp_fq1,temp_fq2)
+
     def _generate_fastq_for_each_clone(self, job):
         """
         Generates biased FASTQ files for a single clone, keeping maternal and paternal files separate.
         """
-        (clone, chrom_ref_df, outdir) = job
-        gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name))
+        (clone, fasta_file, mode, outdir) = job
+        gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name + '_' + mode))
         
-        temp_dir = os.path.join(self.outdir, 'tmp', clone.name)
-        os.makedirs(temp_dir, exist_ok=True)
+        # generate maternal fastq
+        fasta_file = clone.maternal_fasta
+        chromosomes = utils.read_fasta(fasta_file)
+        alpha, beta = utils.fit_beta_to_lorenz(self.lorenz_x, self.lorenz_y)
 
-        # 定义最终的母本和父本FASTQ文件名
-        final_maternal_fq1 = os.path.join(outdir, f'{clone.name}_maternal_r1.fq')
-        final_maternal_fq2 = os.path.join(outdir, f'{clone.name}_maternal_r2.fq')
-        final_paternal_fq1 = os.path.join(outdir, f'{clone.name}_paternal_r1.fq')
-        final_paternal_fq2 = os.path.join(outdir, f'{clone.name}_paternal_r2.fq')
-
-        final_files = [final_maternal_fq1, final_maternal_fq2, final_paternal_fq1, final_paternal_fq2]
-        for f in final_files:
-            open(f, 'w').close()
-
-        Aa, Bb = utils.get_alpha_beta(self.lorenz_x, self.lorenz_y)
-        # self.log(f"  > Lorenz curve parameters for {clone.name}: Alpha={Aa:.2f}, Beta={Bb:.2f}")
-
-        for chrom in sorted(chrom_ref_df['Chromosome'].unique()):
-            # self.log(f"  > Processing chromosome {chrom}...")
-            chrom_bins_df = chrom_ref_df[chrom_ref_df['Chromosome'] == chrom].reset_index(drop=True)
-            num_windows = len(chrom_bins_df)
-            
-            interval = max(10, num_windows // 100)
-            cov_scalers = utils.gen_coverage(num_windows=num_windows, interval=interval, Aa=Aa, Bb=Bb)
-
-            if len(cov_scalers) != num_windows:
-                self.log(f"    ! Warning: Scaler length mismatch on {chrom}. Got {len(cov_scalers)}, expected {num_windows}. Skipping chrom.", level='WARN')
-                continue
-
-            for index, row in chrom_bins_df.iterrows():
-                start, end = int(row['Start']), int(row['End'])
-                bin_size = end - start
-                
-                m_cna = int(row[f'{clone.name}_maternal_cnas'])
-                p_cna = int(row[f'{clone.name}_paternal_cnas'])
-                total_cn = m_cna + p_cna
-                
-                if total_cn == 0:
-                    continue
-                
-                cov_scaler = cov_scalers[index]
-                
-                base_diploid_pe_reads = (self.clone_coverage * bin_size) / (self.reads_len * 2)
-                adjusted_total_pe_reads = base_diploid_pe_reads * (total_cn / 2) * cov_scaler
-                total_reads_sampled = poisson.rvs(adjusted_total_pe_reads)
-                m_pe_reads = round(total_reads_sampled * (m_cna / total_cn))
-                p_pe_reads = round(total_reads_sampled * (p_cna / total_cn))
-
-                region_str = f"{chrom}:{start}-{end}"
-
-                if m_pe_reads > 0:
-                    region_fasta = os.path.join(temp_dir, "m_region.fa")
-                    temp_fq1 = os.path.join(temp_dir, "m_r1.fq")
-                    temp_fq2 = os.path.join(temp_dir, "m_r2.fq")
-                    
-                    samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-                    command = f"{self.samtools} faidx {clone.maternal_fasta} {region_str} > {region_fasta}"
-                    utils.runcmd(command, samtools_log)
-                    
-                    self._run_wgsim_for_region(m_pe_reads, region_fasta, temp_fq1, temp_fq2)
-                    
-                    if os.path.exists(temp_fq1):
-                        os.system(f'cat {temp_fq1} >> {final_maternal_fq1}')
-                        os.system(f'cat {temp_fq2} >> {final_maternal_fq2}')
-
-                if p_pe_reads > 0:
-                    region_fasta = os.path.join(temp_dir, "p_region.fa")
-                    temp_fq1 = os.path.join(temp_dir, "p_r1.fq")
-                    temp_fq2 = os.path.join(temp_dir, "p_r2.fq")
-
-                    samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-                    command = f"{self.samtools} faidx {clone.paternal_fasta} {region_str} > {region_fasta}"
-                    utils.runcmd(command, samtools_log)
-                    
-                    self._run_wgsim_for_region(p_pe_reads, region_fasta, temp_fq1, temp_fq2)
-                    
-                    if os.path.exists(temp_fq1):
-                        os.system(f'cat {temp_fq1} >> {final_paternal_fq1}')
-                        os.system(f'cat {temp_fq2} >> {final_paternal_fq2}')
-        gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name))
-
-    def run_readcount_generation(self, clones, chrom_ref_df, lorenz_x, lorenz_y):
-        """
-        Generates a read count matrix directly without creating FASTQ files.
-        """
-        print("\n--- Starting Read Count Matrix Generation Workflow ---")
+        all_tasks = []
         
-        Aa, Bb = utils.get_alpha_beta(lorenz_x, lorenz_y)
-        print(f"Global Lorenz curve parameters: Alpha={Aa:.2f}, Beta={Bb:.2f}")
-
-        output_file = os.path.join(self.outdir, 'readcounts.tsv')
-        all_counts = []
-
-        for chrom in sorted(chrom_ref_df['Chromosome'].unique()):
-            print(f"  > Processing chromosome {chrom} for read counts...")
-            chrom_bins_df = chrom_ref_df[chrom_ref_df['Chromosome'] == chrom].reset_index(drop=True)
-            num_windows = len(chrom_bins_df)
+        for chr_name, sequence in chromosomes.items():
             
-            interval = max(10, num_windows // 100)
-            cov_scalers = utils.gen_coverage(num_windows=num_windows, interval=interval, Aa=Aa, Bb=Bb)
+            chr_len = len(sequence)
+            num_windows = chr_len // self.window_size
             
-            if len(cov_scalers) != num_windows:
-                print(f"    ! Warning: Scaler length mismatch on {chrom}. Skipping.")
-                continue
-
-            for index, row in chrom_bins_df.iterrows():
-                start, end = int(row['Start']), int(row['End'])
-                bin_size = end - start
-                cov_scaler = cov_scalers[index]
+            # Generate read counts for each window
+            readcounts = utils.gen_readcount(
+                self.clone_coverage/4, # paired end / 2, maternal and paternal / 2
+                self.reads_len, 
+                self.window_size, 
+                num_windows, 
+                alpha, 
+                beta, 
+            )
+            
+            # Create tasks for this chromosome
+            chr_tasks = []
+            total_reads = 0
+            
+            for i, count in enumerate(readcounts):
+                window_start = i * self.window_size
+                window_end = min(window_start + self.window_size, chr_len)
+                window_seq = sequence[window_start:window_end]
                 
-                base_diploid_pe_reads = (self.clone_coverage * bin_size) / (self.reads_len * 2)
+                task = (
+                    chr_name, i, window_seq, count
+                )
+                
+                chr_tasks.append(task)
+                total_reads += count
+            
+            all_tasks.extend(chr_tasks)
 
-                for clone in clones:
-                    m_cna = int(row[f'{clone.name}_maternal_cnas'])
-                    p_cna = int(row[f'{clone.name}_paternal_cnas'])
-                    total_cn = m_cna + p_cna
-                    
-                    if total_cn == 0:
-                        m_count, p_count = 0, 0
-                    else:
-                        adjusted_total_pe_reads = base_diploid_pe_reads * (total_cn / 2) * cov_scaler
-                        total_reads_sampled = poisson.rvs(adjusted_total_pe_reads)
-                        m_count = round(total_reads_sampled * (m_cna / total_cn))
-                        p_count = round(total_reads_sampled * (p_cna / total_cn))
-                    
-                    all_counts.append({
-                        'CELL': clone.name,
-                        'chrom': chrom,
-                        'start': start,
-                        'end': end,
-                        'Acount': m_count,
-                        'Bcount': p_count
-                    })
+        with Pool(processes=self.thread) as pool:
+            results = pool.map(self._run_wgsim_for_window, all_tasks)
+        all_temp_files = [r for r in results if r is not None]
+        # Merge all temporary FASTQ files into final FASTQ files
+        fq1 = os.path.join(outdir, f'{clone.name}_{mode}_1.fq')
+        fq2 = os.path.join(outdir, f'{clone.name}_{mode}_2.fq')
 
-        count_df = pd.DataFrame(all_counts)
-        count_df.to_csv(output_file, sep='\t', index=False)
-        print(f"--- Read Count Matrix Generation Complete. Output: {output_file} ---")
+        with open(fq1, 'w') as out1, open(fq2, 'w') as out2:
+            for window_temp in all_temp_files:
+                for temp_fq1, temp_fq2 in window_temp:
+                    if os.path.exists(temp_fq1):
+                        with open(temp_fq1, 'r') as f:
+                            for line in f:
+                                out1.write(line)
+                    if os.path.exists(temp_fq2):
+                        with open(temp_fq2, 'r') as f:
+                            for line in f:
+                                out2.write(f.read())
+
+        gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name + '_' + mode))
 
     def _alignment_for_each_clone(self, job):
         (clone, fastq_dir, bam_dir, log_dir) = job
@@ -3116,8 +2964,8 @@ class HCDSIM:
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
 
         # set related files
-        m_fasta = os.path.join(dfasta, 'normal_maternal.fasta')
-        p_fasta = os.path.join(dfasta, 'normal_paternal.fasta')
+        m_fasta = os.path.join(dfasta, 'reference_maternal.fasta')
+        p_fasta = os.path.join(dfasta, 'reference_paternal.fasta')
         # phase_file = os.path.join(dprofile, 'phases.tsv')
         allele_phase_file = os.path.join(dprofile, 'snp_phases.csv')
         tree_newick = os.path.join(dprofile, 'tree.newick')
@@ -3180,8 +3028,8 @@ class HCDSIM:
         tree_json = os.path.join(dprofile, 'tree.json')
         ref_file = os.path.join(dprofile, 'reference.csv')
         changes_file = os.path.join(dprofile, 'changes.csv')
-        maternal_fasta = os.path.join(dfasta, 'normal_maternal.fasta')
-        paternal_fasta = os.path.join(dfasta, 'normal_paternal.fasta')
+        maternal_fasta = os.path.join(dfasta, 'reference_maternal.fasta')
+        paternal_fasta = os.path.join(dfasta, 'reference_paternal.fasta')
 
         utils.check_exist(tree_json=tree_json)
         utils.check_exist(reference_csv=ref_file)
@@ -3239,28 +3087,26 @@ class HCDSIM:
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
 
         tree_json = os.path.join(dprofile, 'tree.json')
-        ref_file = os.path.join(dprofile, 'reference.csv')
     
         utils.check_exist(tree_json=tree_json)
-        utils.check_exist(reference_csv=ref_file)
 
         # load object from file
         root = random_tree.load_tree_from_file(tree_json)
-        all_clones = random_tree.collect_all_nodes(root, 1)
-        ref = pd.read_csv(ref_file)
+        all_clones = random_tree.collect_all_nodes(root)
 
         jobs = []
         # check fasta file for each clone
         for clone in all_clones:
             utils.check_exist(maternal_fasta=clone.maternal_fasta)
             utils.check_exist(paternal_fasta=clone.paternal_fasta)
-            jobs.append((clone, ref, dfastq))
+            jobs.append((clone, clone.maternal_fasta, 'maternal', dfastq))
+            jobs.append((clone, clone.paternal_fasta, 'paternal', dfastq))
 
         # set parallel jobs for each clone
         lock = Lock()
         counter = Value('i', 0)
         init_args = (lock, counter, len(jobs))
-        pool = Pool(processes=min(self.thread, len(jobs)), initializer=init_gfastq, initargs=init_args)
+        pool = Pool(processes=1, initializer=init_gfastq, initargs=init_args)
         
         self.log('Generating fastq file for each clone...', level='PROGRESS')
         for _ in pool.imap_unordered(self._generate_fastq_for_each_clone, jobs):
@@ -3283,7 +3129,7 @@ class HCDSIM:
         
         # load object from file
         root = random_tree.load_tree_from_file(tree_json)
-        all_clones = random_tree.collect_all_nodes(root, 1)
+        all_clones = random_tree.collect_all_nodes(root)
 
         jobs = []
         # check fasta file for each clone
@@ -3325,7 +3171,7 @@ class HCDSIM:
         
         # load object from file
         root = random_tree.load_tree_from_file(tree_json)
-        all_clones = random_tree.collect_all_nodes(root, 1)
+        all_clones = random_tree.collect_all_nodes(root)
         
         # check bam file for each clone
         for clone in all_clones:

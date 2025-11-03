@@ -28,8 +28,6 @@ class TreeNode:
         self.paternal_cnas = []
         self.maternal_fasta = None
         self.paternal_fasta = None
-        self.fq1 = None
-        self.fq2 = None
         self.fasta = None
         self.maternal_fasta_length = 0
         self.paternal_fasta_length = 0
@@ -763,7 +761,7 @@ def main():
     
     return root
 
-def collect_all_nodes(root, mode=0):
+def collect_all_nodes(root, mode=1):
     """
     Collect all nodes of a tree into an array iteratively.
     :param root: The root node of the tree.

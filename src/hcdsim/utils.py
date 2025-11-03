@@ -9,10 +9,10 @@ from collections import defaultdict
 
 import numpy as np
 import pandas as pd
-from scipy.stats import beta
-from scipy.optimize import newton_krylov, NoConvergence
 import time
 import functools
+
+from scipy.stats import beta as beta_dist
 
 # check part
 def check_exist(**params):
@@ -600,83 +600,6 @@ def create_allele_count_matrices(count_files, phased_snps_filtered, a_allele_bed
     
     return a_allele_df, b_allele_df
 
-def get_alpha_beta(x0, y0):
-    """Estimating alpha/beta from a point on the Lorenz curve."""
-    def F(P):
-        Aa, Bb = P[0], P[1]
-        X = beta.cdf(float(Aa)/(Aa+Bb), Aa, Bb) - x0
-        Y = beta.cdf(float(Aa)/(Aa+Bb), Aa+1, Bb) - y0
-        return [X, Y]
-    
-    guess = [10, 5]
-    max_n = 1000
-    n = 1
-    sol = None
-    while n < max_n:
-        try:
-            sol = newton_krylov(F, guess, method='lgmres', verbose=0, rdiff=0.1, maxiter=50)
-            break
-        except (NoConvergence, ValueError):
-            guess = np.random.rand(2) * 10 + 0.1
-        n += 1
-    
-    if sol is None:
-        print("Warning: Newton-Krylov failed to converge. Using default [1.38, 1.38].")
-        return [1.38, 1.38]
-    else:
-        return sol
-
-def bezier_coef(points):
-    n = len(points) - 1
-    C = 4 * np.identity(n)
-    np.fill_diagonal(C[1:], 1)
-    np.fill_diagonal(C[:, 1:], 1)
-    C[0, 0] = 2
-    C[n - 1, n - 1] = 7
-    C[n - 1, n - 2] = 2
-    P = [2 * (2 * points[i] + points[i + 1]) for i in range(n)]
-    P[0] = points[0] + 2 * points[1]
-    P[n - 1] = 8 * points[n - 1] + points[n]
-    A = np.linalg.solve(C, P)
-    B = [0] * n
-    for i in range(n - 1):
-        B[i] = 2 * points[i + 1] - A[i + 1]
-    B[n - 1] = (A[n - 1] + points[n]) / 2
-    return A, B
-
-def single_cubic_bezier(a, b, c, d):
-    return lambda t: np.power(1 - t, 3) * a + 3 * np.power(1 - t, 2) * t * b + 3 * (1 - t) * np.power(t, 2) * c + np.power(t, 3) * d
-
-def gen_start_interval(num_windows, interval, Aa, Bb):
-    x = list(range(0, num_windows, interval))
-    if not x or x[-1] != num_windows - 1:
-        x.append(num_windows - 1)
-    y = list(np.random.beta(Aa, Bb, len(x)))
-    return [np.array(p) for p in zip(x, y)]
-
-def gen_coverage(num_windows, interval, Aa, Bb):
-    """Generates a smoothed coverage scaler list for a series of windows."""
-    if num_windows == 0:
-        return []
-    points = gen_start_interval(num_windows, interval, Aa, Bb)
-    if len(points) < 2:
-        return [2 * max(min(p[1], 1), 0) for p in points]
-
-    A, B = bezier_coef(points)
-    curves = [single_cubic_bezier(points[i], A[i], B[i], points[i + 1]) for i in range(len(points) - 1)]
-    
-    new_points = []
-    for i in range(len(points) - 1):
-        f = curves[i]
-        start_idx, end_idx = int(points[i][0]), int(points[i+1][0])
-        gaps = end_idx - start_idx + 1
-        coords = [f(t) for t in np.linspace(0, 1, gaps)]
-        if i == 0:
-            new_points.append(coords[0][1])
-        new_points.extend([c[1] for c in coords[1:]])
-        
-    return [2 * max(min(val, 1), 0) for val in new_points]
-
 def log_runtime(func):
     """A decorator to log and print the execution time of a member method."""
     @functools.wraps(func)
@@ -728,3 +651,133 @@ def set_random_seed(seed):
     np.random.seed(seed)
     
     return seed
+
+def lorenz_curve(x, x0, y0):
+    """Lorenz curve function"""
+    if x <= x0:
+        return (y0 / x0) * x
+    else:
+        return ((1 - y0) / (1 - x0)) * (x - x0) + y0
+
+
+def fit_beta_to_lorenz(x0, y0, num_points=1000):
+    """Fit Beta distribution parameters to Lorenz curve"""
+    x_vals = np.linspace(0, 1, num_points)
+    lorenz_vals = np.array([lorenz_curve(x, x0, y0) for x in x_vals])
+    
+    # Calculate derivatives to get PDF
+    pdf_vals = np.diff(lorenz_vals) / np.diff(x_vals)
+    pdf_vals = np.append(pdf_vals, pdf_vals[-1])
+    
+    # Normalize PDF
+    pdf_vals = pdf_vals / np.sum(pdf_vals)
+    
+    # Estimate Beta parameters
+    mean_val = np.sum(x_vals * pdf_vals)
+    var_val = np.sum((x_vals - mean_val)**2 * pdf_vals)
+    
+    if var_val > 0:
+        alpha = mean_val * ((mean_val * (1 - mean_val)) / var_val - 1)
+        beta = (1 - mean_val) * ((mean_val * (1 - mean_val)) / var_val - 1)
+        alpha = max(0.1, alpha)
+        beta = max(0.1, beta)
+    else:
+        alpha, beta = 2.0, 2.0
+    
+    return alpha, beta
+
+def gen_readcount(cov, l, window_size, num_windows, Alpha, Beta):
+    """
+    Generate read counts for each window using standard Metropolis-Hastings
+    
+    Note: Parameter 'u' is kept for API compatibility but not used in standard MH.
+    Standard MH uses probabilistic acceptance based on the ratio.
+    """
+    
+    # Calculate mean read count per window
+    x0 = Alpha / (Alpha + Beta)
+    mean_read = int(float(cov * window_size) / float(l))
+    
+    # Initialize
+    readcounts = []
+    
+    # Starting point
+    x_p = x0
+    prob_x_p = beta_dist.pdf(x_p, Alpha, Beta)
+    
+    for i in range(num_windows):
+        if i == 0:
+            # First window uses initial value
+            read_p = x_p / x0 * mean_read
+            readcounts.append(int(read_p))
+        else:
+            # Proposal: sample from normal distribution centered at current value
+            proposal_std = 0.1
+            new_x = np.random.normal(x_p, proposal_std)
+            
+            # Ensure new_x is in valid range (0, 1)
+            # Use reflection at boundaries
+            while new_x <= 0 or new_x >= 1:
+                if new_x <= 0:
+                    new_x = -new_x
+                if new_x >= 1:
+                    new_x = 2 - new_x
+            
+            # Calculate probability of new value under Beta distribution
+            new_x_p = beta_dist.pdf(new_x, Alpha, Beta)
+            
+            # Calculate acceptance probability
+            prob_ratio = new_x_p / prob_x_p if prob_x_p > 0 else 1.0
+            
+            # Proposal is symmetric (normal distribution), so prop_ratio = 1
+            acceptance_prob = min(1, prob_ratio)
+            
+            # Standard MH: accept with probability acceptance_prob
+            if np.random.random() < acceptance_prob:
+                x_p = new_x
+                prob_x_p = new_x_p
+            # else: keep current x_p (rejection)
+            
+            # Convert to read count
+            read_p = x_p / x0 * mean_read
+            readcounts.append(int(read_p))
+    
+    return readcounts
+
+def write_fasta(chr_name, sequence, filename):
+    """Write a single chromosome to FASTA file"""
+    with open(filename, 'w') as f:
+        f.write(f">{chr_name}\n")
+        # Write sequence in 60bp lines
+        for i in range(0, len(sequence), 60):
+            f.write(sequence[i:i+60] + '\n')
+
+def read_fasta(fasta_file):
+    """Read all chromosomes from FASTA file"""
+    chromosomes = {}
+    current_chr = None
+    current_seq = []
+    
+    with open(fasta_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            
+            if line.startswith('>'):
+                # Save previous chromosome
+                if current_chr is not None:
+                    chromosomes[current_chr] = ''.join(current_seq)
+                
+                # Start new chromosome
+                current_chr = line[1:].split()[0]
+                current_seq = []
+            else:
+                current_seq.append(line.upper())
+        
+        # Save last chromosome
+        if current_chr is not None:
+            chromosomes[current_chr] = ''.join(current_seq)
+    
+    return chromosomes
+
