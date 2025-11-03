@@ -2691,7 +2691,7 @@ class HCDSIM:
         Generates biased FASTQ files for a single clone, keeping maternal and paternal files separate.
         """
         (clone, fasta_file, mode, outdir) = job
-        gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name + '_' + mode))
+        self.log("Start generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
         
         # generate maternal fastq
         fasta_file = clone.maternal_fasta
@@ -2752,7 +2752,7 @@ class HCDSIM:
                             for line in f:
                                 out2.write(f.read())
 
-        gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name + '_' + mode))
+        self.log("Finish generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
 
     def _alignment_for_each_clone(self, job):
         (clone, fastq_dir, bam_dir, log_dir) = job
