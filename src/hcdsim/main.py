@@ -2743,8 +2743,8 @@ class HCDSIM:
             results = pool.map(self._run_wgsim_for_window, all_tasks)
         all_temp_files = [r for r in results if r is not None]
         # Merge all temporary FASTQ files into final FASTQ files
-        fq1 = os.path.join(outdir, f'{clone.name}_{mode}_1.fq')
-        fq2 = os.path.join(outdir, f'{clone.name}_{mode}_2.fq')
+        fq1 = os.path.join(outdir, f'{clone.name}_{mode}_r1.fq')
+        fq2 = os.path.join(outdir, f'{clone.name}_{mode}_r2.fq')
 
         with open(fq1, 'w') as out1, open(fq2, 'w') as out2:
             for window_temp in all_temp_files:
@@ -2819,27 +2819,27 @@ class HCDSIM:
         align_bar.progress(advance=False, msg="Samtools sort bam for {}".format(clone))
         bam_file = os.path.join(bam_dir, clone+"_maternal.bam")
         sorted_bam_file = os.path.join(bam_dir, clone+"_maternal.sorted.bam")
-        tmp_files.append(sorted_bam_file)
         command = "{0} sort -@ {1} {2} -o {3}".format(self.samtools, self.thread, bam_file, sorted_bam_file)
         utils.runcmd(command, samtools_log)
 
         bam_file = os.path.join(bam_dir, clone+"_paternal.bam")
         sorted_bam_file = os.path.join(bam_dir, clone+"_paternal.sorted.bam")
-        tmp_files.append(sorted_bam_file)
         command = "{0} sort -@ {1} {2} -o {3}".format(self.samtools, self.thread, bam_file, sorted_bam_file)
         utils.runcmd(command, samtools_log)
 
-        align_bar.progress(advance=False, msg="Samtools merge maternal and paternal bam for {}".format(clone))
-        clone_bam = os.path.join(bam_dir, clone+".bam")
-        m_sorted_bam_file = os.path.join(bam_dir, clone+"_maternal.sorted.bam")
-        p_sorted_bam_file = os.path.join(bam_dir, clone+"_paternal.sorted.bam")
-        command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, clone_bam, m_sorted_bam_file, p_sorted_bam_file)
-        utils.runcmd(command, samtools_log)
+        # align_bar.progress(advance=False, msg="Samtools merge maternal and paternal bam for {}".format(clone))
+        # clone_bam = os.path.join(bam_dir, clone+".bam")
+        # m_sorted_bam_file = os.path.join(bam_dir, clone+"_maternal.sorted.bam")
+        # p_sorted_bam_file = os.path.join(bam_dir, clone+"_paternal.sorted.bam")
+        # command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, clone_bam, m_sorted_bam_file, p_sorted_bam_file)
+        # utils.runcmd(command, samtools_log)
 
         # clean sam and unsorted bam
         for tmp_file in tmp_files:
-            if os.path.exists(tmp_file) and os.path.exists(clone_bam):
+            if os.path.exists(tmp_file):
                 os.remove(tmp_file)
+        os.rename(os.path.join(bam_dir, clone+"_maternal.sorted.bam"), os.path.join(bam_dir, clone+"_maternal.bam"))
+        os.rename(os.path.join(bam_dir, clone+"_paternal.sorted.bam"), os.path.join(bam_dir, clone+"_paternal.bam"))
         align_bar.progress(advance=True, msg="Finish alignment process for {}".format(clone))
 
     def _downsampling_cell_bam(self, job):
