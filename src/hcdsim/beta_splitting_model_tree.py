@@ -50,8 +50,6 @@ class TreeNode:
             "paternal_cnas": self.paternal_cnas,
             "maternal_fasta": self.maternal_fasta,
             "paternal_fasta": self.paternal_fasta,
-            "fq1": self.fq1,
-            "fq2": self.fq2,
             "fasta": self.fasta,
             "maternal_fasta_length": self.maternal_fasta_length,
             "paternal_fasta_length": self.paternal_fasta_length,
@@ -73,8 +71,6 @@ class TreeNode:
         node.paternal_cnas = data.get("paternal_cnas", [])
         node.maternal_fasta = data.get("maternal_fasta", None)
         node.paternal_fasta = data.get("paternal_fasta", None)
-        node.fq1 = data.get("fq1", None)
-        node.fq2 = data.get("fq2", None)
         node.fasta = data.get("fasta", None)
         node.maternal_fasta_length = data.get("maternal_fasta_length", 0)
         node.paternal_fasta_length = data.get("paternal_fasta_length", 0)
@@ -804,8 +800,6 @@ def update_node_in_tree(root, new_node):
             node.paternal_cnas = new_node.paternal_cnas
             node.maternal_fasta = new_node.maternal_fasta
             node.paternal_fasta = new_node.paternal_fasta
-            node.fq1 = new_node.fq1
-            node.fq2 = new_node.fq2
             node.fasta = new_node.fasta
             node.maternal_fasta_length = new_node.maternal_fasta_length
             node.paternal_fasta_length = new_node.paternal_fasta_length

@@ -2995,7 +2995,7 @@ class HCDSIM:
         root.paternal_fasta_length = normal_fasta_length
 
         # generate normal fasta with snps 
-        self.log("Building normal fasta file with SNPs data...", level='PROGRESS')
+        self.log("Building reference fasta file with SNPs data...", level='PROGRESS')
         self._buildGenome(m_fasta, p_fasta, allele_phase_file) 
 
         # generate cna for each clone
