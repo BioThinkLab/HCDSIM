@@ -3096,17 +3096,19 @@ class HCDSIM:
             jobs.append((clone, clone.maternal_fasta, 'maternal', dfastq))
             jobs.append((clone, clone.paternal_fasta, 'paternal', dfastq))
 
-        # set parallel jobs for each clone
-        lock = Lock()
-        counter = Value('i', 0)
-        init_args = (lock, counter, len(jobs))
-        pool = Pool(processes=1, initializer=init_gfastq, initargs=init_args)
+        for job in jobs:
+            self._generate_fastq_for_each_clone(job)
+        # # set parallel jobs for each clone
+        # lock = Lock()
+        # counter = Value('i', 0)
+        # init_args = (lock, counter, len(jobs))
+        # pool = Pool(processes=1, initializer=init_gfastq, initargs=init_args)
         
-        self.log('Generating fastq file for each clone...', level='PROGRESS')
-        for _ in pool.imap_unordered(self._generate_fastq_for_each_clone, jobs):
-            pass
-        pool.close()
-        pool.join()
+        # self.log('Generating fastq file for each clone...', level='PROGRESS')
+        # for _ in pool.imap_unordered(self._generate_fastq_for_each_clone, jobs):
+        #     pass
+        # pool.close()
+        # pool.join()
 
         self.log('Storing the tree to json file...', level='PROGRESS')
         random_tree.save_tree_to_file(root, tree_json)
