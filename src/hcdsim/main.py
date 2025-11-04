@@ -2664,7 +2664,7 @@ class HCDSIM:
         Run wgsim for a single window
         Returns the output FASTQ filenames
         """
-        (clone, chr_name, window_idx, window_seq, num_reads) = task
+        (clone, mode, chr_name, window_idx, window_seq, num_reads) = task
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
 
         if num_reads == 0:
@@ -2672,12 +2672,12 @@ class HCDSIM:
         
         # Create temporary files
         temp_dir = os.path.join(self.outdir, 'tmp')
-        temp_fasta = os.path.join(temp_dir, f"{clone}_window_{chr_name}_{window_idx}.fa")
-        temp_fq1 = os.path.join(temp_dir, f"{clone}_reads_{chr_name}_{window_idx}_1.fq")
-        temp_fq2 = os.path.join(temp_dir, f"{clone}_reads_{chr_name}_{window_idx}_2.fq")
+        temp_fasta = os.path.join(temp_dir, f"{clone}_{mode}_window_{chr_name}_{window_idx}.fa")
+        temp_fq1 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chr_name}_{window_idx}_1.fq")
+        temp_fq2 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chr_name}_{window_idx}_2.fq")
         
         # Write window sequence to temp FASTA
-        utils.write_fasta(f"{clone}_{chr_name}_window_{window_idx}", window_seq, temp_fasta)
+        utils.write_fasta(f"{clone}_{mode}_{chr_name}_window_{window_idx}", window_seq, temp_fasta)
         
         # Build wgsim command
         command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,num_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
@@ -2724,7 +2724,7 @@ class HCDSIM:
                 window_seq = sequence[window_start:window_end]
                 
                 task = (
-                    clone, chr_name, i, window_seq, count
+                    clone, mode, chr_name, i, window_seq, count
                 )
                 
                 chr_tasks.append(task)
