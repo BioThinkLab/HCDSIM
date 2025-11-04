@@ -2664,7 +2664,7 @@ class HCDSIM:
         Run wgsim for a single window
         Returns the output FASTQ filenames
         """
-        (chr_name, window_idx, window_seq, num_reads) = task
+        (clone, chr_name, window_idx, window_seq, num_reads) = task
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
 
         if num_reads == 0:
@@ -2672,12 +2672,12 @@ class HCDSIM:
         
         # Create temporary files
         temp_dir = os.path.join(self.outdir, 'tmp')
-        temp_fasta = os.path.join(temp_dir, f"window_{chr_name}_{window_idx}.fa")
-        temp_fq1 = os.path.join(temp_dir, f"reads_{chr_name}_{window_idx}_1.fq")
-        temp_fq2 = os.path.join(temp_dir, f"reads_{chr_name}_{window_idx}_2.fq")
+        temp_fasta = os.path.join(temp_dir, f"{clone}_window_{chr_name}_{window_idx}.fa")
+        temp_fq1 = os.path.join(temp_dir, f"{clone}_reads_{chr_name}_{window_idx}_1.fq")
+        temp_fq2 = os.path.join(temp_dir, f"{clone}_reads_{chr_name}_{window_idx}_2.fq")
         
         # Write window sequence to temp FASTA
-        utils.write_fasta(f"{chr_name}_window_{window_idx}", window_seq, temp_fasta)
+        utils.write_fasta(f"{clone}_{chr_name}_window_{window_idx}", window_seq, temp_fasta)
         
         # Build wgsim command
         command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,num_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
@@ -2691,10 +2691,9 @@ class HCDSIM:
         Generates biased FASTQ files for a single clone, keeping maternal and paternal files separate.
         """
         (clone, fasta_file, mode, outdir) = job
-        self.log("Start generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
+        self.log("Start generating fastq file for {}".format(clone + '_' + mode), level='PROGRESS')
         
         # generate maternal fastq
-        fasta_file = clone.maternal_fasta
         chromosomes = utils.read_fasta(fasta_file)
         alpha, beta = utils.fit_beta_to_lorenz(self.lorenz_x, self.lorenz_y)
 
@@ -2725,7 +2724,7 @@ class HCDSIM:
                 window_seq = sequence[window_start:window_end]
                 
                 task = (
-                    chr_name, i, window_seq, count
+                    clone, chr_name, i, window_seq, count
                 )
                 
                 chr_tasks.append(task)
@@ -2737,8 +2736,8 @@ class HCDSIM:
             results = pool.map(self._run_wgsim_for_window, all_tasks)
         all_temp_files = [r for r in results if r is not None]
         # Merge all temporary FASTQ files into final FASTQ files
-        fq1 = os.path.join(outdir, f'{clone.name}_{mode}_r1.fq')
-        fq2 = os.path.join(outdir, f'{clone.name}_{mode}_r2.fq')
+        fq1 = os.path.join(outdir, f'{clone}_{mode}_r1.fq')
+        fq2 = os.path.join(outdir, f'{clone}_{mode}_r2.fq')
 
         with open(fq1, 'w') as out1, open(fq2, 'w') as out2:
             for temp_fq1, temp_fq2 in all_temp_files:
@@ -2753,7 +2752,7 @@ class HCDSIM:
                     os.remove(temp_fq1)
                 if os.path.exists(temp_fq2):
                     os.remove(temp_fq2)
-        self.log("Finish generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
+        self.log("Finish generating fastq file for {}".format(clone + '_' + mode), level='PROGRESS')
 
     def _alignment_for_each_clone(self, job):
         (clone, fastq_dir, bam_dir, log_dir) = job
@@ -3094,8 +3093,8 @@ class HCDSIM:
         for clone in all_clones:
             utils.check_exist(maternal_fasta=clone.maternal_fasta)
             utils.check_exist(paternal_fasta=clone.paternal_fasta)
-            jobs.append((clone, clone.maternal_fasta, 'maternal', dfastq))
-            jobs.append((clone, clone.paternal_fasta, 'paternal', dfastq))
+            jobs.append((clone.name, clone.maternal_fasta, 'maternal', dfastq))
+            jobs.append((clone.name, clone.paternal_fasta, 'paternal', dfastq))
 
         for job in jobs:
             self._generate_fastq_for_each_clone(job)
