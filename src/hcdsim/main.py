@@ -2741,21 +2741,18 @@ class HCDSIM:
         fq2 = os.path.join(outdir, f'{clone.name}_{mode}_r2.fq')
 
         with open(fq1, 'w') as out1, open(fq2, 'w') as out2:
-            for window_temp in all_temp_files:
-                for temp_fq1, temp_fq2 in window_temp:
-                    if os.path.exists(temp_fq1):
-                        with open(temp_fq1, 'r') as f:
-                            for line in f:
-                                out1.write(line)
-                    if os.path.exists(temp_fq2):
-                        with open(temp_fq2, 'r') as f:
-                            for line in f:
-                                out2.write(f.read())
-                    # Remove temporary files
-                    if os.path.exists(temp_fq1):
-                        os.remove(temp_fq1)
-                    if os.path.exists(temp_fq2):
-                        os.remove(temp_fq2)
+            for temp_fq1, temp_fq2 in all_temp_files:
+                if os.path.exists(temp_fq1):
+                    with open(temp_fq1, 'r') as f:
+                        out1.write(f.read())
+                if os.path.exists(temp_fq2):
+                    with open(temp_fq2, 'r') as f:
+                        out2.write(f.read())
+                # Remove temporary files
+                if os.path.exists(temp_fq1):
+                    os.remove(temp_fq1)
+                if os.path.exists(temp_fq2):
+                    os.remove(temp_fq2)
         self.log("Finish generating fastq file for {}".format(clone.name + '_' + mode), level='PROGRESS')
 
     def _alignment_for_each_clone(self, job):
