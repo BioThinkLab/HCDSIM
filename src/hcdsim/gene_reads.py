@@ -47,6 +47,55 @@ def setup_logger(log_file=None):
 # Lorenz Curve to Beta Distribution
 # ============================================================================
 
+# def lorenz_to_beta(x0, y0, logger=None):
+#     """
+#     Convert a point on Lorenz curve to Beta distribution parameters
+    
+#     Based on equations (1) and (2) in Mallory et al. 2020:
+#     F(x) = I_x(α, β)
+#     φ(x) = I_x(α+1, β)
+    
+#     Parameters:
+#         x0: X-coordinate on Lorenz curve (cumulative proportion of bins)
+#         y0: Y-coordinate on Lorenz curve (cumulative proportion of coverage)
+        
+#     Returns:
+#         (alpha, beta): Parameters for Beta distribution
+#     """
+#     if logger:
+#         logger.info(f"Converting Lorenz({x0}, {y0}) to Beta distribution...")
+    
+#     def equations(params):
+#         alpha, beta = params
+#         if alpha <= 0 or beta <= 0:
+#             return [1e10, 1e10]
+        
+#         try:
+#             # Find x value from inverse regularized incomplete beta function
+#             x = betaincinv(alpha, beta, x0)
+            
+#             # Check constraints
+#             eq1 = betainc(alpha, beta, x) - x0
+#             eq2 = betainc(alpha + 1, beta, x) - y0
+            
+#             return [eq1, eq2]
+#         except:
+#             return [1e10, 1e10]
+    
+#     # Solve for alpha and beta
+#     initial_guess = [2.0, 2.0]
+#     solution = fsolve(equations, initial_guess)
+#     alpha, beta = solution
+    
+#     # Validate
+#     if alpha <= 0 or beta <= 0:
+#         raise ValueError(f"Invalid Beta parameters: α={alpha}, β={beta}")
+    
+#     if logger:
+#         logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f})")
+    
+#     return alpha, beta
+
 def lorenz_to_beta(x0, y0, logger=None):
     """
     Convert a point on Lorenz curve to Beta distribution parameters
@@ -70,6 +119,10 @@ def lorenz_to_beta(x0, y0, logger=None):
         if alpha <= 0 or beta <= 0:
             return [1e10, 1e10]
         
+        # Add constraint to avoid extreme parameters
+        if alpha + beta > 20:
+            return [1e10, 1e10]
+        
         try:
             # Find x value from inverse regularized incomplete beta function
             x = betaincinv(alpha, beta, x0)
@@ -82,20 +135,117 @@ def lorenz_to_beta(x0, y0, logger=None):
         except:
             return [1e10, 1e10]
     
-    # Solve for alpha and beta
-    initial_guess = [2.0, 2.0]
-    solution = fsolve(equations, initial_guess)
-    alpha, beta = solution
+    # Use adaptive initial guess based on y0 value
+    # Smaller y0 needs smaller alpha/beta (flatter distribution)
+    if y0 < 0.23:
+        initial_alpha = 0.5 + (y0 - 0.15) * 6
+    elif y0 < 0.28:
+        initial_alpha = 1.0 + (y0 - 0.23) * 8
+    elif y0 < 0.38:
+        initial_alpha = 1.5 + (y0 - 0.28) * 15
+    else:
+        initial_alpha = 3.0 + (y0 - 0.38) * 10
     
-    # Validate
+    # Clamp initial guess to reasonable range
+    initial_alpha = max(0.3, min(initial_alpha, 8.0))
+    
+    # Try multiple initial guesses to find the best solution
+    best_solution = None
+    best_error = float('inf')
+    
+    for init_alpha in [initial_alpha * 0.5, initial_alpha, initial_alpha * 1.5]:
+        try:
+            solution = fsolve(equations, [init_alpha, init_alpha], full_output=True)
+            params, info, ier, msg = solution
+            
+            if ier == 1:  # Solution converged
+                alpha, beta = params
+                
+                # Calculate error
+                error = sum([e**2 for e in info['fvec']])
+                
+                # Validate solution
+                if alpha > 0 and beta > 0 and alpha + beta <= 20:
+                    # Additional check: verify the solution produces reasonable quantiles
+                    try:
+                        x = betaincinv(alpha, beta, x0)
+                        actual_y = betainc(alpha + 1, beta, x)
+                        
+                        # Accept if error is small
+                        if abs(actual_y - y0) < 0.01 and error < best_error:
+                            best_error = error
+                            best_solution = (alpha, beta)
+                    except:
+                        continue
+        except:
+            continue
+    
+    # If no good solution found, use fallback with relaxed constraints
+    if best_solution is None:
+        if logger:
+            logger.warning(f"  Primary solver failed, using fallback method...")
+        
+        # Fallback: use bounded optimization
+        from scipy.optimize import minimize
+        
+        def objective(params):
+            alpha, beta = params
+            if alpha <= 0 or beta <= 0:
+                return 1e10
+            
+            try:
+                x = betaincinv(alpha, beta, x0)
+                err1 = (betainc(alpha, beta, x) - x0)**2
+                err2 = (betainc(alpha + 1, beta, x) - y0)**2
+                
+                # Penalty for extreme parameters
+                penalty = 0
+                if alpha + beta > 15:
+                    penalty = ((alpha + beta - 15) / 5)**2
+                
+                return err1 * 100 + err2 * 100 + penalty
+            except:
+                return 1e10
+        
+        result = minimize(
+            objective,
+            [initial_alpha, initial_alpha],
+            method='L-BFGS-B',
+            bounds=[(0.1, 10), (0.1, 10)]
+        )
+        
+        if result.success and result.fun < 1.0:
+            best_solution = tuple(result.x)
+        else:
+            # Last resort: use simple symmetric distribution
+            if logger:
+                logger.warning(f"  Fallback optimization failed, using approximate solution...")
+            
+            # Empirical approximation: α ≈ β ≈ f(y0)
+            # Based on the pattern that smaller y needs smaller parameters
+            approx_alpha = 0.5 + (y0 - 0.15) * 12
+            approx_alpha = max(0.3, min(approx_alpha, 8.0))
+            best_solution = (approx_alpha, approx_alpha)
+    
+    alpha, beta = best_solution
+    
+    # Final validation
     if alpha <= 0 or beta <= 0:
         raise ValueError(f"Invalid Beta parameters: α={alpha}, β={beta}")
     
     if logger:
-        logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f})")
+        logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f}), α+β={alpha+beta:.4f}")
+        
+        # Log diagnostic information
+        try:
+            x = betaincinv(alpha, beta, x0)
+            actual_y = betainc(alpha + 1, beta, x)
+            variance = (alpha * beta) / ((alpha + beta)**2 * (alpha + beta + 1))
+            logger.info(f"  Verification: target y={y0:.4f}, actual y={actual_y:.4f}, variance={variance:.6f}")
+        except:
+            pass
     
     return alpha, beta
-
 
 # ============================================================================
 # Coverage Sampling with Gaussian Copula
