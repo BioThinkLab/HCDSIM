@@ -12,7 +12,10 @@ import pandas as pd
 import time
 import functools
 
-from scipy.stats import beta as beta_dist
+from scipy.special import betainc, betaincinv
+from scipy.stats import beta as beta_dist, norm
+from scipy.optimize import fsolve
+from pyfaidx import Fasta
 
 # check part
 def check_exist(**params):
@@ -652,134 +655,49 @@ def set_random_seed(seed):
     
     return seed
 
-def lorenz_curve(x, x0, y0):
-    """Lorenz curve function"""
-    if x <= x0:
-        return (y0 / x0) * x
-    else:
-        return ((1 - y0) / (1 - x0)) * (x - x0) + y0
-
-
-def fit_beta_to_lorenz(x0, y0, num_points=1000):
-    """Fit Beta distribution parameters to Lorenz curve"""
-    x_vals = np.linspace(0, 1, num_points)
-    lorenz_vals = np.array([lorenz_curve(x, x0, y0) for x in x_vals])
+def lorenz_to_beta(x0, y0):
+    """
+    Convert a point on Lorenz curve to Beta distribution parameters
     
-    # Calculate derivatives to get PDF
-    pdf_vals = np.diff(lorenz_vals) / np.diff(x_vals)
-    pdf_vals = np.append(pdf_vals, pdf_vals[-1])
+    Based on equations (1) and (2) in Mallory et al. 2020:
+    F(x) = I_x(α, β)
+    φ(x) = I_x(α+1, β)
     
-    # Normalize PDF
-    pdf_vals = pdf_vals / np.sum(pdf_vals)
+    Parameters:
+        x0: X-coordinate on Lorenz curve (cumulative proportion of bins)
+        y0: Y-coordinate on Lorenz curve (cumulative proportion of coverage)
+        
+    Returns:
+        (alpha, beta): Parameters for Beta distribution
+    """
     
-    # Estimate Beta parameters
-    mean_val = np.sum(x_vals * pdf_vals)
-    var_val = np.sum((x_vals - mean_val)**2 * pdf_vals)
+    def equations(params):
+        alpha, beta = params
+        if alpha <= 0 or beta <= 0:
+            return [1e10, 1e10]
+        
+        try:
+            # Find x value from inverse regularized incomplete beta function
+            x = betaincinv(alpha, beta, x0)
+            
+            # Check constraints
+            eq1 = betainc(alpha, beta, x) - x0
+            eq2 = betainc(alpha + 1, beta, x) - y0
+            
+            return [eq1, eq2]
+        except:
+            return [1e10, 1e10]
     
-    if var_val > 0:
-        alpha = mean_val * ((mean_val * (1 - mean_val)) / var_val - 1)
-        beta = (1 - mean_val) * ((mean_val * (1 - mean_val)) / var_val - 1)
-        alpha = max(0.1, alpha)
-        beta = max(0.1, beta)
-    else:
-        alpha, beta = 2.0, 2.0
+    # Solve for alpha and beta
+    initial_guess = [2.0, 2.0]
+    solution = fsolve(equations, initial_guess)
+    alpha, beta = solution
+    
+    # Validate
+    if alpha <= 0 or beta <= 0:
+        raise ValueError(f"Invalid Beta parameters: α={alpha}, β={beta}")
     
     return alpha, beta
-
-def gen_readcount(cov, l, window_size, num_windows, Alpha, Beta):
-    """
-    Generate read counts for each window using standard Metropolis-Hastings
-    
-    Note: Parameter 'u' is kept for API compatibility but not used in standard MH.
-    Standard MH uses probabilistic acceptance based on the ratio.
-    """
-    
-    # Calculate mean read count per window
-    x0 = Alpha / (Alpha + Beta)
-    mean_read = int(float(cov * window_size) / float(l))
-    
-    # Initialize
-    readcounts = []
-    
-    # Starting point
-    x_p = x0
-    prob_x_p = beta_dist.pdf(x_p, Alpha, Beta)
-    
-    for i in range(num_windows):
-        if i == 0:
-            # First window uses initial value
-            read_p = x_p / x0 * mean_read
-            readcounts.append(int(read_p))
-        else:
-            # Proposal: sample from normal distribution centered at current value
-            proposal_std = 0.1
-            new_x = np.random.normal(x_p, proposal_std)
-            
-            # Ensure new_x is in valid range (0, 1)
-            # Use reflection at boundaries
-            while new_x <= 0 or new_x >= 1:
-                if new_x <= 0:
-                    new_x = -new_x
-                if new_x >= 1:
-                    new_x = 2 - new_x
-            
-            # Calculate probability of new value under Beta distribution
-            new_x_p = beta_dist.pdf(new_x, Alpha, Beta)
-            
-            # Calculate acceptance probability
-            prob_ratio = new_x_p / prob_x_p if prob_x_p > 0 else 1.0
-            
-            # Proposal is symmetric (normal distribution), so prop_ratio = 1
-            acceptance_prob = min(1, prob_ratio)
-            
-            # Standard MH: accept with probability acceptance_prob
-            if np.random.random() < acceptance_prob:
-                x_p = new_x
-                prob_x_p = new_x_p
-            # else: keep current x_p (rejection)
-            
-            # Convert to read count
-            read_p = x_p / x0 * mean_read
-            readcounts.append(int(read_p))
-    
-    return readcounts
-
-def write_fasta(chr_name, sequence, filename):
-    """Write a single chromosome to FASTA file"""
-    with open(filename, 'w') as f:
-        f.write(f">{chr_name}\n")
-        # Write sequence in 60bp lines
-        for i in range(0, len(sequence), 60):
-            f.write(sequence[i:i+60] + '\n')
-
-def read_fasta(fasta_file):
-    """Read all chromosomes from FASTA file"""
-    chromosomes = {}
-    current_chr = None
-    current_seq = []
-    
-    with open(fasta_file, 'r') as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
-            
-            if line.startswith('>'):
-                # Save previous chromosome
-                if current_chr is not None:
-                    chromosomes[current_chr] = ''.join(current_seq)
-                
-                # Start new chromosome
-                current_chr = line[1:].split()[0]
-                current_seq = []
-            else:
-                current_seq.append(line.upper())
-        
-        # Save last chromosome
-        if current_chr is not None:
-            chromosomes[current_chr] = ''.join(current_seq)
-    
-    return chromosomes
 
 def find_segment_type(df, child, chromosome, bin_start, bin_end):
     """
@@ -820,3 +738,80 @@ def find_segment_type(df, child, chromosome, bin_start, bin_end):
             return row['Type']
     
     return None  # 未找到匹配的segment
+
+def generate_bin_regions(fasta_file, bin_size):
+    """
+    Divide genome into non-overlapping bins
+    
+    Parameters:
+        fasta_file: Input genome FASTA file
+        bin_size: Size of each bin in bp
+        
+    Returns:
+        List of (chrom, start, end, bin_index) tuples
+    """
+    
+    genome = Fasta(fasta_file)
+    bins = []
+    bin_idx = 0
+    
+    for chrom in genome.keys():
+        chrom_len = len(genome[chrom])
+        
+        for start in range(0, chrom_len, bin_size):
+            end = min(start + bin_size, chrom_len)
+            bins.append((str(chrom), start, end, bin_idx))
+            bin_idx += 1
+    
+    return bins
+
+# ============================================================================
+# Coverage Sampling with Gaussian Copula
+# ============================================================================
+
+def sample_coverage_with_correlation(n_bins, alpha, beta, correlation_length=10):
+    """
+    Sample coverage with spatial correlation using Gaussian copula
+    
+    This method ensures:
+    1. Marginal distribution is exactly Beta(alpha, beta)
+    2. Adjacent bins have spatial correlation
+    3. Correlation decays exponentially with distance
+    
+    Parameters:
+        n_bins: Number of bins
+        alpha, beta: Beta distribution parameters
+        correlation_length: Number of bins over which correlation decays
+        
+    Returns:
+        coverage_array: Relative coverage (mean=1.0)
+    """
+    
+    # Step 1: Create correlation matrix (exponential decay)
+    indices = np.arange(n_bins)
+    distances = np.abs(indices[:, None] - indices[None, :])
+    corr_matrix = np.exp(-distances / correlation_length)
+    
+    # Step 2: Sample from multivariate Gaussian
+    mean = np.zeros(n_bins)
+    
+    # Use Cholesky decomposition for sampling
+    try:
+        L = np.linalg.cholesky(corr_matrix)
+    except np.linalg.LinAlgError:
+        # If matrix is not positive definite, add small diagonal
+        corr_matrix += np.eye(n_bins) * 1e-6
+        L = np.linalg.cholesky(corr_matrix)
+    
+    gaussian_samples = mean + L @ np.random.randn(n_bins)
+    
+    # Step 3: Transform to uniform via Gaussian CDF
+    uniform_samples = norm.cdf(gaussian_samples)
+    
+    # Step 4: Transform to Beta via inverse CDF (quantile function)
+    beta_samples = beta_dist.ppf(uniform_samples, alpha, beta)
+    
+    # Step 5: Normalize to mean=1.0
+    coverage = beta_samples / np.mean(beta_samples)
+    
+    return coverage

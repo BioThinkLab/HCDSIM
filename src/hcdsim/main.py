@@ -84,6 +84,7 @@ class HCDSIM:
                 lorenz_x: float = 0.5,
                 lorenz_y: float = 0.4,
                 window_size: int = 200000,
+                correlation_len: int = 10,
                 max_ploidy: int = None,
                 max_cna_value: int = 10,
                 wgsim: str = 'wgsim', 
@@ -636,545 +637,6 @@ class HCDSIM:
                 process_chromosome(chrom, chrom_size)
         
         return pd.DataFrame(bins)
-
-    # def _generate_cna_profile_for_each_clone(self, root, ref, m_fasta, p_fasta):
-    #     cutoff = self.cna_prob
-    #     changes = []
-    #     all_chroms = ref['Chromosome'].unique().tolist()
-    #     if self.wgd_cna_no + self.wcl_cna_no > len(all_chroms):
-    #         raise Exception("The sum of wgd_cna_no and wcl_cna_no should be less or equal to the total number of chromosomes!")
-
-    #     # store maternal and paternal genome to dict
-    #     maternal_genome = {}
-    #     paternal_genome = {}
-    #     with open(m_fasta, 'r') as input:
-    #         chrom = None
-    #         for line in input:
-    #             line = line.strip()
-    #             if line.startswith('>'):
-    #                 chrom = line.strip()[1:].split()[0]
-    #                 maternal_genome[chrom] = ''
-    #             else:
-    #                 maternal_genome[chrom] += line
-    #     with open(p_fasta, 'r') as input:
-    #         chrom = None
-    #         for line in input:
-    #             line = line.strip()
-    #             if line.startswith('>'):
-    #                 chrom = line.strip()[1:].split()[0]
-    #                 paternal_genome[chrom] = ''
-    #             else:
-    #                 paternal_genome[chrom] += line
-        
-    #     # add nromal clone to cna matrix
-    #     root.maternal_cnas = []
-    #     root.paternal_cnas = []
-    #     root.changes = []
-    #     for i in range(ref.shape[0]):
-    #         root.maternal_cnas.append(1)
-    #         root.paternal_cnas.append(1)
-    #     ref[root.name+'_maternal_cnas'] = root.maternal_cnas
-    #     ref[root.name+'_paternal_cnas'] = root.paternal_cnas
-        
-    #     # add the children of normal clone to queue
-    #     queue = deque(root.children)
-
-    #     max_ploidy_flag = False
-    #     while  queue:
-    #         clone = queue.popleft()
-    #         clone.maternal_cnas = []
-    #         clone.paternal_cnas = []
-    #         clone.changes = []
-
-    #         if clone.depth == 1: # children of normal clone
-    #             mirrored_cna_flag = False
-
-    #             wgd_chroms = []
-    #             wcl_chroms = []
-    #             # select WGD and WCL chromosomes
-    #             random_chroms = random.sample(all_chroms, self.wgd_cna_no+self.wcl_cna_no)
-    #             wgd_chroms = random_chroms[:self.wgd_cna_no]
-    #             wcl_chroms = random_chroms[self.wcl_cna_no:]
-    #             wgd_cnas = dict.fromkeys(wgd_chroms) # store the cna number for each wgd chrom
-    #             wcl_cnas = dict.fromkeys(wcl_chroms) # store the cna number for each wgd chrom
-
-    #             # select the position for CNL_LOH, CNN_LOH, GOH and Mirror CNA
-    #             cnl_loh_no = int(self.loh_cna_no/3)
-    #             random_bins = random.sample(range(0, ref.shape[0]), self.loh_cna_no + self.goh_cna_no + self.mirror_cna_no)
-    #             cnl_loh_bins = random_bins[:cnl_loh_no]
-    #             cnn_loh_bins = random_bins[cnl_loh_no:self.loh_cna_no]
-    #             goh_bins = random_bins[self.loh_cna_no:self.loh_cna_no + self.goh_cna_no]
-    #             mirrored_cna_bins = random_bins[self.loh_cna_no + self.goh_cna_no:]
-                
-    #             for i in range(ref.shape[0]):
-    #                 # if flag is ture, the previous bin has been process as Mirror CNA bin and skip it.
-    #                 if mirrored_cna_flag:
-    #                     mirrored_cna_flag = False
-    #                     continue
-                    
-    #                 current_chrom = ref['Chromosome'][i]
-    #                 start = ref['Start'][i]
-    #                 end = ref['End'][i]
-    #                 m_sequence = maternal_genome[current_chrom][start-1:end]
-    #                 p_sequence = paternal_genome[current_chrom][start-1:end]
-
-    #                 # handle WGD
-    #                 if current_chrom in wgd_chroms:
-    #                     if not wgd_cnas[current_chrom]:
-    #                         if self.max_ploidy and not max_ploidy_flag:
-    #                             m_cna = self.max_ploidy
-    #                             p_cna = utils.random_WGD()
-    #                             max_ploidy_flag = True
-    #                         else:
-    #                             m_cna = utils.random_WGD()
-    #                             p_cna = utils.random_WGD()
-    #                         wgd_cnas[current_chrom] = [m_cna, p_cna]
-    #                         # 1. WGD in maternal and paternal 2. WGD in maternal 3. WGD in paternal
-    #                         random_prob = random.random()
-    #                         if random_prob < 1/3:
-    #                             case = 0
-    #                             wgd_cnas[current_chrom].append(0)
-    #                         elif random_prob > 2/3:
-    #                             case = 1
-    #                             wgd_cnas[current_chrom].append(1)
-    #                         else:
-    #                             case = 2
-    #                             wgd_cnas[current_chrom].append(2)
-    #                         # clone.changes.append('WGD')
-    #                     else:
-    #                         m_cna = wgd_cnas[current_chrom][0]
-    #                         p_cna = wgd_cnas[current_chrom][1]
-    #                         case = wgd_cnas[current_chrom][2]
-
-    #                     # 1. WGD in maternal and paternal 2. WGD in maternal 3. WGD in paternal
-    #                     if case == 0:
-    #                         changes.append(['normal',clone.name,'maternal','WGD',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                         changes.append(['normal',clone.name,'paternal','WGD',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                         clone.maternal_cnas.append(m_cna)
-    #                         clone.paternal_cnas.append(p_cna)
-    #                     elif case == 1:
-    #                         changes.append(['normal',clone.name,'maternal','WGD',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                         clone.maternal_cnas.append(m_cna)
-    #                         clone.paternal_cnas.append(1)
-    #                     else:
-    #                         changes.append(['normal',clone.name,'paternal','WGD',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                         clone.maternal_cnas.append(1)
-    #                         clone.paternal_cnas.append(p_cna)
-    #                     clone.changes.append('WGD')
-    #                     continue
-                    
-    #                 # handle WCL
-    #                 if current_chrom in wcl_chroms:
-    #                     if not wcl_cnas[current_chrom]:
-    #                         # 1. WCL in maternal and paternal 2. WCL in maternal 3. WCL in paternal
-    #                         random_prob = random.random()
-    #                         if random_prob < 1/3:
-    #                             wcl_cnas[current_chrom] = (True, True)
-    #                         elif random_prob > 2/3:
-    #                             wcl_cnas[current_chrom] = (True, False)
-    #                         else:
-    #                             wcl_cnas[current_chrom] = (False, True)
-
-    #                     if wcl_cnas[current_chrom][0]:
-    #                         changes.append(['normal',clone.name,'maternal','WCL',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                         clone.maternal_cnas.append(0)
-    #                     else:
-    #                         clone.maternal_cnas.append(1)
-    #                     if wcl_cnas[current_chrom][1]:
-    #                         changes.append(['normal',clone.name,'paternal','WCL',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                         clone.paternal_cnas.append(0)
-    #                     else:
-    #                         clone.paternal_cnas.append(1)
-    #                     clone.changes.append('WCL')
-    #                     continue
-                    
-    #                 # handle CNL_LOH: 1:0 or 0:1
-    #                 if i in cnl_loh_bins:
-    #                     # check heterozygosity
-    #                     if m_sequence != p_sequence:
-    #                         # cnl_cna = utils.random_CNL()
-    #                         cnl_cna = 1
-
-    #                         if random.random() < 0.5: # m:p = 1:0
-    #                             # if cnl_cna != 1:
-    #                             #     changes.append(['normal',clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnl_cna)])
-    #                             changes.append(['normal',clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                             clone.maternal_cnas.append(cnl_cna)
-    #                             clone.paternal_cnas.append(0)
-    #                         else: # m:p = 0:1
-    #                             # if cnl_cna != 1:
-    #                             #     changes.append(['normal',clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnl_cna)])
-    #                             changes.append(['normal',clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                             clone.maternal_cnas.append(0)
-    #                             clone.paternal_cnas.append(cnl_cna)
-    #                         clone.changes.append('CNL_LOH')
-    #                         continue
-    #                     else:
-    #                         clone.maternal_cnas.append(1)
-    #                         clone.paternal_cnas.append(1)
-    #                         clone.changes.append('NONE')
-    #                         continue
-                    
-    #                 # handle CNN_LOH: 2:0 or 0:2
-    #                 if i in cnn_loh_bins:
-    #                     # check heterozygosity
-    #                     if m_sequence != p_sequence:
-    #                         cnn_cna = utils.random_mirrored_cna()
-
-    #                         if random.random() < 0.5: # m:p = 2:0
-    #                             if cnn_cna == 2:
-    #                                 changes.append(['normal',clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                 changes.append(['normal',clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                             else:
-    #                                 changes.append(['normal',clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                 changes.append(['normal',clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                             clone.maternal_cnas.append(cnn_cna)
-    #                             clone.paternal_cnas.append(0)
-    #                         else: # m:p = 0:1
-    #                             if cnn_cna == 2:
-    #                                 changes.append(['normal',clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 changes.append(['normal',clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                             else:
-    #                                 changes.append(['normal',clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 changes.append(['normal',clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                             clone.maternal_cnas.append(0)
-    #                             clone.paternal_cnas.append(cnn_cna)
-    #                         if cnn_cna == 2:
-    #                             clone.changes.append('CNN_LOH')
-    #                         else:
-    #                             clone.changes.append('CNG_LOH')
-    #                         continue
-    #                     else:
-    #                         clone.maternal_cnas.append(1)
-    #                         clone.paternal_cnas.append(1)
-    #                         clone.changes.append('NONE')
-    #                         continue
-                    
-    #                 # handle GOH
-    #                 if i in goh_bins:
-    #                     # check heterozygosity
-    #                     if m_sequence == p_sequence:
-    #                         m_cna = utils.random_WGD()
-    #                         p_cna = utils.random_WGD()
-    #                         changes.append(['normal',clone.name,'maternal','GOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                         changes.append(['normal',clone.name,'paternal','GOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                         clone.maternal_cnas.append(m_cna)
-    #                         clone.paternal_cnas.append(p_cna)
-    #                         clone.changes.append('GOH')
-    #                         continue
-    #                     else:
-    #                         clone.maternal_cnas.append(1)
-    #                         clone.paternal_cnas.append(1)
-    #                         clone.changes.append('NONE')
-    #                         continue
-                    
-    #                 # handle Mirror CNA
-    #                 if i in mirrored_cna_bins:
-    #                     # make sure the next bin located in same chromosome
-    #                     if i+1 >= ref.shape[0] or ref['Chromosome'][i] != ref['Chromosome'][i+1]:
-    #                         clone.maternal_cnas.append(1)
-    #                         clone.paternal_cnas.append(1)
-    #                         clone.changes.append('NONE')
-    #                         continue
-
-    #                     # generate Mirror CNA number
-    #                     total_cna = utils.random_mirrored_cna()
-    #                     cna1 = random.randint(0,total_cna)
-    #                     while cna1 == total_cna/2:
-    #                         cna1 = random.randint(0, total_cna)
-    #                     cna2 = total_cna - cna1
-    #                     if random.random() < 0.5: # m:p = cna1:cna2
-    #                         changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna1)])
-    #                         changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna2)])
-    #                         changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna2)])
-    #                         changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna1)])
-    #                         clone.maternal_cnas.append(cna1)
-    #                         clone.paternal_cnas.append(cna2)
-    #                         clone.maternal_cnas.append(cna2)
-    #                         clone.paternal_cnas.append(cna1)
-    #                     else: # m:p = cna2:cna1
-    #                         changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna2)])
-    #                         changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna1)])
-    #                         changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna1)])
-    #                         changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna2)])
-    #                         clone.maternal_cnas.append(cna2)
-    #                         clone.paternal_cnas.append(cna1)
-    #                         clone.maternal_cnas.append(cna1)
-    #                         clone.paternal_cnas.append(cna2)
-    #                     mirrored_cna_flag = True
-    #                     clone.changes.append('Mirror CNA')
-    #                     clone.changes.append('Mirror CNA')
-    #                     continue
-                    
-    #                 # generate random cna
-    #                 if random.random() > cutoff: # 20% cna
-    #                     m_cna = utils.random_cna()
-    #                     p_cna = utils.random_cna()
-                        
-
-    #                     # check whether is CNL_LOH
-    #                     if (m_sequence != p_sequence) and ((m_cna == 0 and p_cna !=0) or (m_cna != 0 and p_cna ==0)):
-    #                         if m_cna == 1 or p_cna == 1:
-    #                             changes.append(['normal',clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                             changes.append(['normal',clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                             clone.changes.append('CNL_LOH')
-    #                         elif m_cna == 2 or p_cna == 2:
-    #                             changes.append(['normal',clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                             changes.append(['normal',clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                             clone.changes.append('CNN_LOH')
-    #                         else:
-    #                             changes.append(['normal',clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                             changes.append(['normal',clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                             clone.changes.append('CNG_LOH')
-    #                         clone.maternal_cnas.append(m_cna)
-    #                         clone.paternal_cnas.append(p_cna)
-    #                         continue
-                        
-    #                     # check mirrored CNV
-    #                     if clone.changes and clone.changes[-1] in ['REGULAR', 'NONE']:
-    #                         if m_cna != p_cna and m_cna == clone.paternal_cnas[-1] and clone.maternal_cnas[-1] == p_cna:
-    #                             if clone.changes[-1] == 'REGULAR':
-    #                                 clone.changes.pop()
-    #                                 changes.pop()
-    #                                 changes.pop()
-    #                             changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i-1]+':'+str(ref['Start'][i-1])+'-'+str(ref['End'][i-1]),'1->'+str(clone.maternal_cnas[-1])])
-    #                             changes.append(['normal',clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                             changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i-1]+':'+str(ref['Start'][i-1])+'-'+str(ref['End'][i-1]),'1->'+str(clone.paternal_cnas[-1])])
-    #                             changes.append(['normal',clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                             clone.maternal_cnas.append(m_cna)
-    #                             clone.paternal_cnas.append(p_cna)
-    #                             clone.changes.append('Mirror CNA')
-    #                             clone.changes.append('Mirror CNA')
-    #                             continue
-                        
-    #                     # normal case
-    #                     if m_cna == 0:
-    #                         mtype = 'DEL'
-    #                     else:
-    #                         mtype = 'DUP'
-    #                     changes.append(['normal',clone.name,'maternal',mtype,ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                     if p_cna == 0:
-    #                         ptype = 'DEL'
-    #                     else:
-    #                         ptype = 'DUP'
-    #                     changes.append(['normal',clone.name,'paternal',ptype,ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-
-    #                     clone.maternal_cnas.append(m_cna)
-    #                     clone.paternal_cnas.append(p_cna)
-    #                     clone.changes.append('REGULAR')
-    #                 else: # normal
-    #                     clone.maternal_cnas.append(1)
-    #                     clone.paternal_cnas.append(1)
-    #                     clone.changes.append('NONE')
-    #         else:
-    #             # first inherit from parent
-    #             clone.maternal_cnas = copy.deepcopy(clone.parent.maternal_cnas)
-    #             clone.paternal_cnas = copy.deepcopy(clone.parent.paternal_cnas)
-    #             clone.changes = copy.deepcopy(clone.parent.changes)
-
-    #              # select the position for CNL_LOH, CNN_LOH, GOH and Mirror CNA
-    #             cnl_loh_no = int(self.loh_cna_no/3)
-    #             random_bins = random.sample(range(0, ref.shape[0]), self.loh_cna_no + self.goh_cna_no + self.mirror_cna_no)
-    #             cnl_loh_bins = random_bins[:cnl_loh_no]
-    #             cnn_loh_bins = random_bins[cnl_loh_no:self.loh_cna_no]
-    #             goh_bins = random_bins[self.loh_cna_no:self.loh_cna_no + self.goh_cna_no]
-    #             mirrored_cna_bins = random_bins[self.loh_cna_no + self.goh_cna_no:]
-    #             mirrored_cna_flag = False
-
-    #             for i, item in enumerate(clone.paternal_cnas):
-    #                 # if flag is ture, the previous bin has been process as Mirror CNA bin and skip it.
-    #                 if mirrored_cna_flag:
-    #                     mirrored_cna_flag = False
-    #                     continue
-                    
-    #                 if clone.parent.changes[i] not in ['REGULAR', 'NONE']:
-    #                     continue
-
-    #                 current_chrom = ref['Chromosome'][i]
-    #                 start = ref['Start'][i]
-    #                 end = ref['End'][i]
-    #                 m_sequence = maternal_genome[current_chrom][start-1:end]
-    #                 p_sequence = paternal_genome[current_chrom][start-1:end]
-
-    #                 m_parent_cna = clone.maternal_cnas[i]
-    #                 p_parent_cna = clone.paternal_cnas[i]
-
-    #                 if clone.parent.changes[i] == 'NONE':
-    #                     # handle CNL_LOH: 1:0 or 0:1
-    #                     if i in cnl_loh_bins:
-    #                         # check heterozygosity
-    #                         if m_sequence != p_sequence:
-    #                             # cnl_cna = utils.random_CNL()
-    #                             cnl_cna = 1
-
-    #                             if random.random() < 0.5: # m:p = 1:0
-    #                                 # if cnl_cna != 1:
-    #                                 #     changes.append([clone.parent.name,clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnl_cna)])
-    #                                 changes.append([clone.parent.name,clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 clone.maternal_cnas[i] = cnl_cna
-    #                                 clone.paternal_cnas[i] = 0
-    #                             else: # m:p = 0:1
-    #                                 # if cnl_cna != 1:
-    #                                 #     changes.append([clone.parent.name,clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnl_cna)])
-    #                                 changes.append([clone.parent.name,clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 clone.maternal_cnas[i] = 0
-    #                                 clone.paternal_cnas[i] = cnl_cna
-    #                             clone.changes[i] = 'CNL_LOH'
-    #                             continue
-    #                         else:
-    #                             continue
-                        
-    #                     # handle CNN_LOH: 2:0 or 0:2
-    #                     if i in cnn_loh_bins:
-    #                         # check heterozygosity
-    #                         if m_sequence != p_sequence:
-    #                             cnn_cna = utils.random_mirrored_cna()
-
-    #                             if random.random() < 0.5: # m:p = 2:0
-    #                                 if cnn_cna == 2:
-    #                                     changes.append([clone.parent.name,clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                     changes.append([clone.parent.name,clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 else:
-    #                                     changes.append([clone.parent.name,clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                     changes.append([clone.parent.name,clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 clone.maternal_cnas[i] = cnn_cna
-    #                                 clone.paternal_cnas[i] = 0
-    #                             else: # m:p = 0:1
-    #                                 if cnn_cna == 2:
-    #                                     changes.append([clone.parent.name,clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                     changes.append([clone.parent.name,clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                 else:
-    #                                     changes.append([clone.parent.name,clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cnn_cna)])
-    #                                     changes.append([clone.parent.name,clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(0)])
-    #                                 clone.maternal_cnas[i] = 0
-    #                                 clone.paternal_cnas[i] = cnn_cna
-    #                             if cnn_cna == 2:
-    #                                 clone.changes[i] = 'CNN_LOH'
-    #                             else:
-    #                                 clone.changes[i] = 'CNG_LOH'
-    #                             continue
-    #                         else:
-    #                             continue
-                    
-    #                     # handle GOH
-    #                     if i in goh_bins:
-    #                         # check heterozygosity
-    #                         if m_sequence == p_sequence:
-    #                             m_cna = utils.random_WGD()
-    #                             p_cna = utils.random_WGD()
-    #                             changes.append([clone.parent.name,clone.name,'maternal','GOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(m_cna)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','GOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(p_cna)])
-    #                             clone.maternal_cnas[i] = m_cna
-    #                             clone.paternal_cnas[i] = p_cna
-    #                             clone.changes[i] = 'GOH'
-    #                             continue
-    #                         else:
-    #                             continue
-                    
-    #                     # handle Mirror CNA
-    #                     if i in mirrored_cna_bins:
-    #                         # make sure the next bin located in same chromosome
-    #                         if i+1 >= len(clone.paternal_cnas) or ref['Chromosome'][i] != ref['Chromosome'][i+1] or clone.parent.changes[i+1] != 'NONE':
-    #                             continue
-
-    #                         # generate Mirror CNA number
-    #                         total_cna = utils.random_mirrored_cna()
-    #                         cna1 = random.randint(0,total_cna)
-    #                         while cna1 == total_cna/2:
-    #                             cna1 = random.randint(0, total_cna)
-    #                         cna2 = total_cna - cna1
-    #                         if random.random() < 0.5: # m:p = cna1:cna2
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna1)])
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna2)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna2)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna1)])
-    #                             clone.maternal_cnas[i] = cna1
-    #                             clone.paternal_cnas[i] = cna2
-    #                             clone.maternal_cnas[i+1] = cna2
-    #                             clone.paternal_cnas[i+1] = cna1
-    #                         else: # m:p = cna2:cna1
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna2)])
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna1)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),'1->'+str(cna1)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i+1]+':'+str(ref['Start'][i+1])+'-'+str(ref['End'][i+1]),'1->'+str(cna2)])
-    #                             clone.maternal_cnas[i] = cna2
-    #                             clone.paternal_cnas[i] = cna1
-    #                             clone.maternal_cnas[i+1] = cna1
-    #                             clone.paternal_cnas[i+1] = cna2
-    #                         mirrored_cna_flag = True
-    #                         clone.changes[i] = 'Mirror CNA'
-    #                         clone.changes[i+1] = 'Mirror CNA'
-    #                         continue
-                    
-    #                 # regular situation
-    #                 if random.random() > cutoff: # 20% cna
-    #                     m_cna = utils.random_cna()
-    #                     p_cna = utils.random_cna()
-    #                     if m_parent_cna == 0:
-    #                         m_cna = 0
-    #                     else:
-    #                         m_cna = random.randint(m_parent_cna, max(5, m_parent_cna+1))
-                        
-    #                     if p_parent_cna == 0:
-    #                         p_cna = 0
-    #                     else:
-    #                         p_cna = random.randint(p_parent_cna, max(5, p_parent_cna+1))
-                        
-    #                     # check whether is CNL_LOH
-    #                     if (m_sequence != p_sequence) and ((m_cna == 0 and p_cna !=0) or (m_cna != 0 and p_cna ==0)):
-    #                         if m_cna == 1 or p_cna == 1:
-    #                             changes.append([clone.parent.name,clone.name,'maternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','CNL_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                             clone.changes[i] = 'CNL_LOH'
-    #                         elif m_cna == 2 or p_cna == 2:
-    #                             changes.append([clone.parent.name,clone.name,'maternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','CNN_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                             clone.changes[i] = 'CNN_LOH'
-    #                         else:
-    #                             changes.append([clone.parent.name,clone.name,'maternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','CNG_LOH',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                             clone.changes[i] = 'CNG_LOH'
-
-    #                         clone.maternal_cnas[i] = m_cna
-    #                         clone.paternal_cnas[i] = p_cna
-    #                         continue
-                        
-    #                     # check mirrored CNV
-    #                     if clone.changes and clone.changes[i-1] in ['REGULAR', 'NONE']:
-    #                         if m_cna != p_cna and m_cna == clone.paternal_cnas[-1] and clone.maternal_cnas[-1] == p_cna:
-    #                             clone.maternal_cnas[i] = m_cna
-    #                             clone.paternal_cnas[i] = p_cna
-    #                             if clone.changes[i-1] == 'REGULAR':
-    #                                 changes.pop()
-    #                                 changes.pop()
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i-1]+':'+str(ref['Start'][i-1])+'-'+str(ref['End'][i-1]),str(clone.parent.maternal_cnas[i-1])+'->'+str(clone.maternal_cnas[i-1])])
-    #                             changes.append([clone.parent.name,clone.name,'maternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i-1]+':'+str(ref['Start'][i-1])+'-'+str(ref['End'][i-1]),str(clone.parent.paternal_cnas[i-1])+'->'+str(clone.paternal_cnas[i-1])])
-    #                             changes.append([clone.parent.name,clone.name,'paternal','Mirror CNA',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                             clone.changes[i-1] = 'Mirror CNA'
-    #                             clone.changes[i] = 'Mirror CNA'
-    #                             continue
-
-    #                     if m_cna != m_parent_cna:
-    #                         if m_cna == 0:
-    #                             changes.append([clone.parent.name,clone.name,'maternal','DEL',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-    #                         else:
-    #                             changes.append([clone.parent.name,clone.name,'maternal','DUP',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(m_parent_cna)+'->'+str(m_cna)])
-                        
-    #                     if p_cna != p_parent_cna:
-    #                         if p_cna == 0:
-    #                             changes.append([clone.parent.name,clone.name,'paternal','DEL',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                         else:
-    #                             changes.append([clone.parent.name,clone.name,'paternal','DUP',ref['Chromosome'][i]+':'+str(ref['Start'][i])+'-'+str(ref['End'][i]),str(p_parent_cna)+'->'+str(p_cna)])
-    #                     clone.maternal_cnas[i] = m_cna
-    #                     clone.paternal_cnas[i] = p_cna
-    #                     clone.changes[i] = 'REGULAR'
-            
-    #         ref[clone.name+'_maternal_cnas'] = clone.maternal_cnas
-    #         ref[clone.name+'_paternal_cnas'] = clone.paternal_cnas
-    #         queue.extend(clone.children)
-
-    #     return ref, changes, maternal_genome, paternal_genome
 
     def _generate_cna_profile_for_each_clone(self, root, ref, m_fasta, p_fasta):
         
@@ -2628,29 +2090,6 @@ class HCDSIM:
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
         utils.runcmd(command, wgsim_log)
 
-    def _generate_fastq_for_each_clone_bk(self, job):
-        (clone, outdir) = job
-        gfastq_bar.progress(advance=False, msg="Start generating fastq file for {}".format(clone.name))
-
-        # generate maternal fastq
-        pe_reads = round(clone.maternal_fasta_length*self.clone_coverage/(self.reads_len*4), 6)
-        fq1 = os.path.join(outdir, clone.name+'_maternal_r1.fq')
-        fq2 = os.path.join(outdir, clone.name+'_maternal_r2.fq')
-        clone.fq1 = fq1
-        clone.fq2 = fq2
-
-        self._wgsim_process(pe_reads,clone.maternal_fasta,fq1,fq2)
-
-        # generae paternal fastq
-        pe_reads = round(clone.paternal_fasta_length*self.clone_coverage/(self.reads_len*4), 6)
-        fq1 = os.path.join(outdir, clone.name+'_paternal_r1.fq')
-        fq2 = os.path.join(outdir, clone.name+'_paternal_r2.fq')
-        clone.fq1 = fq1
-        clone.fq2 = fq2
-
-        self._wgsim_process(pe_reads,clone.paternal_fasta,fq1,fq2)
-        gfastq_bar.progress(advance=True, msg="Finish generating fastq file for {}".format(clone.name))
-
     def _run_wgsim_for_region(self, pe_reads, fasta_region_file, temp_fq1, temp_fq2):
         """A helper function to run wgsim for a single small region."""
         if pe_reads <= 0:
@@ -2659,33 +2098,49 @@ class HCDSIM:
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
         utils.runcmd(command, wgsim_log)
 
-    def _run_wgsim_for_window(self, task):
+    def _run_wgsim_for_window(self, args):
         """
-        Run wgsim for a single window
-        Returns the output FASTQ filenames
+        Worker function for generating reads for a single bin using wgsim
+        
+        Parameters:
+            args: Tuple of (fasta_file, bin_info, coverage, params)
+            
+        Returns:
+            (r1_fastq, r2_fastq, bin_idx, n_reads) or None if failed
         """
-        (clone, mode, chr_name, window_idx, window_seq, num_reads) = task
+        clone, fasta_file, mode, bin_info, coverage = args
+        chrom, start, end, bin_idx = bin_info
+        bin_length = end - start
         wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
+        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
 
-        if num_reads == 0:
+        # Calculate number of read pairs needed
+        # coverage = (n_reads × 2 × read_length) / bin_length
+        n_reads = int(coverage * bin_length / (2 * self.reads_len))
+        
+        # Skip bins with zero coverage
+        if n_reads == 0:
             return None
         
-        # Create temporary files
+        # Create temporary directory for this bin
         temp_dir = os.path.join(self.outdir, 'tmp')
-        temp_fasta = os.path.join(temp_dir, f"{clone}_{mode}_window_{chr_name}_{window_idx}.fa")
-        temp_fq1 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chr_name}_{window_idx}_1.fq")
-        temp_fq2 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chr_name}_{window_idx}_2.fq")
+        temp_fasta = os.path.join(temp_dir, f"{clone}_{mode}_window_{chrom}_{bin_idx}.fa")
+        temp_fq1 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chrom}_{bin_idx}_1.fq")
+        temp_fq2 = os.path.join(temp_dir, f"{clone}_{mode}_reads_{chrom}_{bin_idx}_2.fq")
         
-        # Write window sequence to temp FASTA
-        utils.write_fasta(f"{clone}_{mode}_{chr_name}_window_{window_idx}", window_seq, temp_fasta)
+        # Extract region using samtools faidx
+        region = f"{chrom}:{start+1}-{end}"  # 1-based coordinate
         
+        cmd = f"{self.samtools} faidx {fasta_file} {region} > {temp_fasta}"
+        utils.runcmd(cmd, samtools_log)
+
         # Build wgsim command
-        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,num_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
+        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,n_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
         utils.runcmd(command, wgsim_log)
         if os.path.exists(temp_fasta):
             os.remove(temp_fasta)
         return (temp_fq1,temp_fq2)
-
+            
     def _generate_fastq_for_each_clone(self, job):
         """
         Generates biased FASTQ files for a single clone, keeping maternal and paternal files separate.
@@ -2693,47 +2148,20 @@ class HCDSIM:
         (clone, fasta_file, mode, outdir) = job
         self.log("Start generating fastq file for {}".format(clone + '_' + mode), level='PROGRESS')
         
-        # generate maternal fastq
-        chromosomes = utils.read_fasta(fasta_file)
-        alpha, beta = utils.fit_beta_to_lorenz(self.lorenz_x, self.lorenz_y)
+        alpha, beta = utils.lorenz_to_beta(self.lorenz_x, self.lorenz_y)
+        bins = utils.generate_bin_regions(fasta_file, self.window_size)
 
-        all_tasks = []
+        relative_coverage = utils.sample_coverage_with_correlation( len(bins), alpha, beta, correlation_length=self.correlation_len)
+        coverage_per_bin = relative_coverage * self.clone_coverage
         
-        for chr_name, sequence in chromosomes.items():
-            
-            chr_len = len(sequence)
-            num_windows = chr_len // self.window_size
-            
-            # Generate read counts for each window
-            readcounts = utils.gen_readcount(
-                self.clone_coverage/4, # paired end / 2, maternal and paternal / 2
-                self.reads_len, 
-                self.window_size, 
-                num_windows, 
-                alpha, 
-                beta, 
-            )
-            
-            # Create tasks for this chromosome
-            chr_tasks = []
-            total_reads = 0
-            
-            for i, count in enumerate(readcounts):
-                window_start = i * self.window_size
-                window_end = min(window_start + self.window_size, chr_len)
-                window_seq = sequence[window_start:window_end]
-                
-                task = (
-                    clone, mode, chr_name, i, window_seq, count
-                )
-                
-                chr_tasks.append(task)
-                total_reads += count
-            
-            all_tasks.extend(chr_tasks)
+        # Prepare tasks
+        tasks = [
+            (clone, fasta_file, mode, bin_info, cov/2)
+            for bin_info, cov in zip(bins, coverage_per_bin)
+        ]
 
         with Pool(processes=self.thread) as pool:
-            results = pool.map(self._run_wgsim_for_window, all_tasks)
+            results = pool.map(self._run_wgsim_for_window, tasks)
         all_temp_files = [r for r in results if r is not None]
         # Merge all temporary FASTQ files into final FASTQ files
         fq1 = os.path.join(outdir, f'{clone}_{mode}_r1.fq')
