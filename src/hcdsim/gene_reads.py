@@ -114,13 +114,24 @@ def lorenz_to_beta(x0, y0, logger=None):
     if logger:
         logger.info(f"Converting Lorenz({x0}, {y0}) to Beta distribution...")
     
+    # Adaptive constraint on alpha + beta based on y0
+    # Lower y0 needs smaller alpha+beta (flatter distribution)
+    if y0 < 0.24:
+        max_alpha_beta = 5.0   # Very flat for low Gini
+    elif y0 < 0.28:
+        max_alpha_beta = 10.0  # Moderate for mid-low Gini
+    elif y0 < 0.35:
+        max_alpha_beta = 15.0  # Higher for mid Gini
+    else:
+        max_alpha_beta = 20.0  # Maximum for high Gini
+    
     def equations(params):
         alpha, beta = params
         if alpha <= 0 or beta <= 0:
             return [1e10, 1e10]
         
-        # Add constraint to avoid extreme parameters
-        if alpha + beta > 20:
+        # Apply adaptive constraint
+        if alpha + beta > max_alpha_beta:
             return [1e10, 1e10]
         
         try:
@@ -137,23 +148,34 @@ def lorenz_to_beta(x0, y0, logger=None):
     
     # Use adaptive initial guess based on y0 value
     # Smaller y0 needs smaller alpha/beta (flatter distribution)
-    if y0 < 0.23:
-        initial_alpha = 0.5 + (y0 - 0.15) * 6
+    if y0 < 0.22:
+        initial_alpha = 0.3 + (y0 - 0.15) * 4
+    elif y0 < 0.24:
+        initial_alpha = 0.6 + (y0 - 0.22) * 8
     elif y0 < 0.28:
-        initial_alpha = 1.0 + (y0 - 0.23) * 8
-    elif y0 < 0.38:
+        initial_alpha = 1.0 + (y0 - 0.24) * 10
+    elif y0 < 0.35:
         initial_alpha = 1.5 + (y0 - 0.28) * 15
     else:
-        initial_alpha = 3.0 + (y0 - 0.38) * 10
+        initial_alpha = 3.0 + (y0 - 0.35) * 12
     
     # Clamp initial guess to reasonable range
-    initial_alpha = max(0.3, min(initial_alpha, 8.0))
+    initial_alpha = max(0.2, min(initial_alpha, max_alpha_beta / 2))
     
     # Try multiple initial guesses to find the best solution
     best_solution = None
     best_error = float('inf')
     
-    for init_alpha in [initial_alpha * 0.5, initial_alpha, initial_alpha * 1.5]:
+    # More conservative initial guesses for low y values
+    if y0 < 0.24:
+        guess_multipliers = [0.3, 0.6, 1.0]
+    else:
+        guess_multipliers = [0.5, 1.0, 1.5]
+    
+    for multiplier in guess_multipliers:
+        init_alpha = initial_alpha * multiplier
+        init_alpha = max(0.2, min(init_alpha, max_alpha_beta / 2))
+        
         try:
             solution = fsolve(equations, [init_alpha, init_alpha], full_output=True)
             params, info, ier, msg = solution
@@ -165,7 +187,7 @@ def lorenz_to_beta(x0, y0, logger=None):
                 error = sum([e**2 for e in info['fvec']])
                 
                 # Validate solution
-                if alpha > 0 and beta > 0 and alpha + beta <= 20:
+                if alpha > 0 and beta > 0 and alpha + beta <= max_alpha_beta:
                     # Additional check: verify the solution produces reasonable quantiles
                     try:
                         x = betaincinv(alpha, beta, x0)
@@ -198,20 +220,27 @@ def lorenz_to_beta(x0, y0, logger=None):
                 err1 = (betainc(alpha, beta, x) - x0)**2
                 err2 = (betainc(alpha + 1, beta, x) - y0)**2
                 
-                # Penalty for extreme parameters
+                # Stronger penalty for extreme parameters
                 penalty = 0
-                if alpha + beta > 15:
-                    penalty = ((alpha + beta - 15) / 5)**2
+                alpha_beta_sum = alpha + beta
+                if alpha_beta_sum > max_alpha_beta * 0.8:
+                    penalty = ((alpha_beta_sum - max_alpha_beta * 0.8) / (max_alpha_beta * 0.2))**2
                 
-                return err1 * 100 + err2 * 100 + penalty
+                # Additional penalty for asymmetry (we want symmetric Beta)
+                asymmetry_penalty = (alpha - beta)**2 / (alpha + beta)
+                
+                return err1 * 100 + err2 * 100 + penalty * 10 + asymmetry_penalty
             except:
                 return 1e10
+        
+        # Tighter bounds for low y values
+        upper_bound = max_alpha_beta / 2
         
         result = minimize(
             objective,
             [initial_alpha, initial_alpha],
             method='L-BFGS-B',
-            bounds=[(0.1, 10), (0.1, 10)]
+            bounds=[(0.1, upper_bound), (0.1, upper_bound)]
         )
         
         if result.success and result.fun < 1.0:
@@ -221,10 +250,13 @@ def lorenz_to_beta(x0, y0, logger=None):
             if logger:
                 logger.warning(f"  Fallback optimization failed, using approximate solution...")
             
-            # Empirical approximation: α ≈ β ≈ f(y0)
-            # Based on the pattern that smaller y needs smaller parameters
-            approx_alpha = 0.5 + (y0 - 0.15) * 12
-            approx_alpha = max(0.3, min(approx_alpha, 8.0))
+            # Empirical approximation with tighter constraints
+            if y0 < 0.24:
+                approx_alpha = 0.3 + (y0 - 0.15) * 5
+            else:
+                approx_alpha = 0.5 + (y0 - 0.15) * 12
+            
+            approx_alpha = max(0.2, min(approx_alpha, max_alpha_beta / 2))
             best_solution = (approx_alpha, approx_alpha)
     
     alpha, beta = best_solution
@@ -235,18 +267,23 @@ def lorenz_to_beta(x0, y0, logger=None):
     
     if logger:
         logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f}), α+β={alpha+beta:.4f}")
+        logger.info(f"  Constraint: α+β ≤ {max_alpha_beta:.1f}")
         
         # Log diagnostic information
         try:
             x = betaincinv(alpha, beta, x0)
             actual_y = betainc(alpha + 1, beta, x)
             variance = (alpha * beta) / ((alpha + beta)**2 * (alpha + beta + 1))
-            logger.info(f"  Verification: target y={y0:.4f}, actual y={actual_y:.4f}, variance={variance:.6f}")
-        except:
-            pass
+            
+            # Estimate expected proportion of near-zero values
+            p_low = betainc(alpha, beta, 0.05)  # P(X < 0.05)
+            
+            logger.info(f"  Verification: target y={y0:.4f}, actual y={actual_y:.4f}")
+            logger.info(f"  Variance={variance:.6f}, P(X<0.05)={p_low:.4f}")
+        except Exception as e:
+            logger.warning(f"  Verification failed: {e}")
     
     return alpha, beta
-
 # ============================================================================
 # Coverage Sampling with Gaussian Copula
 # ============================================================================
