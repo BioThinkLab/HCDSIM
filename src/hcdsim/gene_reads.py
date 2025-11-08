@@ -101,8 +101,9 @@ def lorenz_to_beta(x0, y0, logger=None):
     Convert a point on Lorenz curve to Beta distribution parameters
     
     Based on equations (1) and (2) in Mallory et al. 2020:
-    F(x) = I_x(α, β)
-    φ(x) = I_x(α+1, β)
+    At x = α/(α+β):
+    F(α/(α+β)) = I_{α/(α+β)}(α, β) = x0
+    φ(α/(α+β)) = I_{α/(α+β)}(α+1, β) = y0
     
     Parameters:
         x0: X-coordinate on Lorenz curve (cumulative proportion of bins)
@@ -111,175 +112,196 @@ def lorenz_to_beta(x0, y0, logger=None):
     Returns:
         (alpha, beta): Parameters for Beta distribution
     """
+    from scipy.stats import beta as beta_dist
+    from scipy.optimize import newton_krylov, fsolve
+    from scipy.optimize.nonlin import NoConvergence
+    import numpy as np
+    
     if logger:
         logger.info(f"Converting Lorenz({x0}, {y0}) to Beta distribution...")
     
-    # Adaptive constraint on alpha + beta based on y0
-    # Lower y0 needs smaller alpha+beta (flatter distribution)
-    if y0 < 0.24:
-        max_alpha_beta = 5.0   # Very flat for low Gini
-    elif y0 < 0.28:
-        max_alpha_beta = 10.0  # Moderate for mid-low Gini
-    elif y0 < 0.35:
-        max_alpha_beta = 15.0  # Higher for mid Gini
-    else:
-        max_alpha_beta = 20.0  # Maximum for high Gini
-    
-    def equations(params):
-        alpha, beta = params
+    def equations(P):
+        """
+        System of equations to solve:
+        F(x) = I_x(α, β) = x0
+        φ(x) = I_x(α+1, β) = y0
+        where x = α/(α+β)
+        """
+        alpha, beta = P[0], P[1]
+        
         if alpha <= 0 or beta <= 0:
             return [1e10, 1e10]
         
-        # Apply adaptive constraint
-        if alpha + beta > max_alpha_beta:
-            return [1e10, 1e10]
-        
         try:
-            # Find x value from inverse regularized incomplete beta function
-            x = betaincinv(alpha, beta, x0)
+            # The key point: x is defined as α/(α+β)
+            x = alpha / (alpha + beta)
             
-            # Check constraints
-            eq1 = betainc(alpha, beta, x) - x0
-            eq2 = betainc(alpha + 1, beta, x) - y0
+            # Equation 1: CDF at x with parameters (α, β)
+            F_x = beta_dist.cdf(x, alpha, beta)
+            eq1 = F_x - x0
+            
+            # Equation 2: CDF at x with parameters (α+1, β)
+            Phi_x = beta_dist.cdf(x, alpha + 1, beta)
+            eq2 = Phi_x - y0
             
             return [eq1, eq2]
         except:
             return [1e10, 1e10]
     
-    # Use adaptive initial guess based on y0 value
-    # Smaller y0 needs smaller alpha/beta (flatter distribution)
-    if y0 < 0.22:
-        initial_alpha = 0.3 + (y0 - 0.15) * 4
-    elif y0 < 0.24:
-        initial_alpha = 0.6 + (y0 - 0.22) * 8
-    elif y0 < 0.28:
-        initial_alpha = 1.0 + (y0 - 0.24) * 10
-    elif y0 < 0.35:
-        initial_alpha = 1.5 + (y0 - 0.28) * 15
-    else:
-        initial_alpha = 3.0 + (y0 - 0.35) * 12
+    # Method 1: Try newton_krylov (as in original code)
+    guess = [2.0, 2.0]
+    max_attempts = 100
+    solution = None
     
-    # Clamp initial guess to reasonable range
-    initial_alpha = max(0.2, min(initial_alpha, max_alpha_beta / 2))
-    
-    # Try multiple initial guesses to find the best solution
-    best_solution = None
-    best_error = float('inf')
-    
-    # More conservative initial guesses for low y values
-    if y0 < 0.24:
-        guess_multipliers = [0.3, 0.6, 1.0]
-    else:
-        guess_multipliers = [0.5, 1.0, 1.5]
-    
-    for multiplier in guess_multipliers:
-        init_alpha = initial_alpha * multiplier
-        init_alpha = max(0.2, min(init_alpha, max_alpha_beta / 2))
-        
+    for attempt in range(max_attempts):
         try:
-            solution = fsolve(equations, [init_alpha, init_alpha], full_output=True)
-            params, info, ier, msg = solution
+            sol = newton_krylov(
+                equations, 
+                guess, 
+                method='lgmres', 
+                verbose=0, 
+                rdiff=0.1, 
+                maxiter=50
+            )
             
-            if ier == 1:  # Solution converged
-                alpha, beta = params
+            alpha, beta = sol[0], sol[1]
+            
+            # Validate solution
+            if alpha > 0 and beta > 0:
+                # Verify the solution
+                x = alpha / (alpha + beta)
+                F_x = beta_dist.cdf(x, alpha, beta)
+                Phi_x = beta_dist.cdf(x, alpha + 1, beta)
                 
-                # Calculate error
-                error = sum([e**2 for e in info['fvec']])
+                error = abs(F_x - x0) + abs(Phi_x - y0)
                 
-                # Validate solution
-                if alpha > 0 and beta > 0 and alpha + beta <= max_alpha_beta:
-                    # Additional check: verify the solution produces reasonable quantiles
-                    try:
-                        x = betaincinv(alpha, beta, x0)
-                        actual_y = betainc(alpha + 1, beta, x)
+                if error < 0.01:  # Good enough
+                    solution = (alpha, beta)
+                    if logger:
+                        logger.info(f"  Converged with newton_krylov after {attempt + 1} attempts")
+                    break
+        except (NoConvergence, ValueError):
+            # Random new guess
+            guess = np.random.rand(2) * 10 + 0.1
+        except Exception as e:
+            guess = np.random.rand(2) * 10 + 0.1
+    
+    # Method 2: Fallback to fsolve if newton_krylov fails
+    if solution is None:
+        if logger:
+            logger.warning(f"  newton_krylov failed, trying fsolve...")
+        
+        # Try multiple initial guesses
+        initial_guesses = [
+            [1.0, 1.0],
+            [2.0, 2.0],
+            [0.5, 0.5],
+            [3.0, 3.0],
+            [y0 * 5, y0 * 5]  # Heuristic based on y0
+        ]
+        
+        best_solution = None
+        best_error = float('inf')
+        
+        for init_guess in initial_guesses:
+            try:
+                sol = fsolve(equations, init_guess, full_output=True)
+                params, info, ier, msg = sol
+                
+                if ier == 1:  # Converged
+                    alpha, beta = params[0], params[1]
+                    
+                    if alpha > 0 and beta > 0:
+                        # Calculate error
+                        error = sum([e**2 for e in info['fvec']])
                         
-                        # Accept if error is small
-                        if abs(actual_y - y0) < 0.01 and error < best_error:
+                        if error < best_error:
                             best_error = error
                             best_solution = (alpha, beta)
-                    except:
-                        continue
-        except:
-            continue
-    
-    # If no good solution found, use fallback with relaxed constraints
-    if best_solution is None:
-        if logger:
-            logger.warning(f"  Primary solver failed, using fallback method...")
+            except:
+                continue
         
-        # Fallback: use bounded optimization
+        if best_solution is not None and best_error < 0.01:
+            solution = best_solution
+            if logger:
+                logger.info(f"  Converged with fsolve")
+    
+    # Method 3: Last resort - bounded optimization
+    if solution is None:
+        if logger:
+            logger.warning(f"  Both newton_krylov and fsolve failed, using bounded optimization...")
+        
         from scipy.optimize import minimize
         
-        def objective(params):
-            alpha, beta = params
+        def objective(P):
+            alpha, beta = P[0], P[1]
             if alpha <= 0 or beta <= 0:
                 return 1e10
             
             try:
-                x = betaincinv(alpha, beta, x0)
-                err1 = (betainc(alpha, beta, x) - x0)**2
-                err2 = (betainc(alpha + 1, beta, x) - y0)**2
+                x = alpha / (alpha + beta)
+                F_x = beta_dist.cdf(x, alpha, beta)
+                Phi_x = beta_dist.cdf(x, alpha + 1, beta)
                 
-                # Stronger penalty for extreme parameters
-                penalty = 0
-                alpha_beta_sum = alpha + beta
-                if alpha_beta_sum > max_alpha_beta * 0.8:
-                    penalty = ((alpha_beta_sum - max_alpha_beta * 0.8) / (max_alpha_beta * 0.2))**2
+                err1 = (F_x - x0)**2
+                err2 = (Phi_x - y0)**2
                 
-                # Additional penalty for asymmetry (we want symmetric Beta)
-                asymmetry_penalty = (alpha - beta)**2 / (alpha + beta)
-                
-                return err1 * 100 + err2 * 100 + penalty * 10 + asymmetry_penalty
+                return err1 * 100 + err2 * 100
             except:
                 return 1e10
         
-        # Tighter bounds for low y values
-        upper_bound = max_alpha_beta / 2
+        # Heuristic initial guess based on y0
+        if y0 < 0.25:
+            init_alpha = 0.5
+        elif y0 < 0.35:
+            init_alpha = 1.5
+        else:
+            init_alpha = 3.0
         
         result = minimize(
             objective,
-            [initial_alpha, initial_alpha],
+            [init_alpha, init_alpha],
             method='L-BFGS-B',
-            bounds=[(0.1, upper_bound), (0.1, upper_bound)]
+            bounds=[(0.1, 20), (0.1, 20)]
         )
         
         if result.success and result.fun < 1.0:
-            best_solution = tuple(result.x)
-        else:
-            # Last resort: use simple symmetric distribution
+            solution = tuple(result.x)
             if logger:
-                logger.warning(f"  Fallback optimization failed, using approximate solution...")
-            
-            # Empirical approximation with tighter constraints
-            if y0 < 0.24:
-                approx_alpha = 0.3 + (y0 - 0.15) * 5
-            else:
-                approx_alpha = 0.5 + (y0 - 0.15) * 12
-            
-            approx_alpha = max(0.2, min(approx_alpha, max_alpha_beta / 2))
-            best_solution = (approx_alpha, approx_alpha)
+                logger.info(f"  Converged with bounded optimization")
     
-    alpha, beta = best_solution
+    # Final validation and error handling
+    if solution is None:
+        error_msg = f"Failed to find valid Beta parameters for Lorenz({x0}, {y0})"
+        if logger:
+            logger.error(f"  {error_msg}")
+        raise ValueError(error_msg)
     
-    # Final validation
+    alpha, beta = solution
+    
     if alpha <= 0 or beta <= 0:
         raise ValueError(f"Invalid Beta parameters: α={alpha}, β={beta}")
     
+    # Log results and diagnostics
     if logger:
         logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f}), α+β={alpha+beta:.4f}")
-        logger.info(f"  Constraint: α+β ≤ {max_alpha_beta:.1f}")
         
-        # Log diagnostic information
         try:
-            x = betaincinv(alpha, beta, x0)
-            actual_y = betainc(alpha + 1, beta, x)
+            # Verify the solution
+            x = alpha / (alpha + beta)
+            F_x = beta_dist.cdf(x, alpha, beta)
+            Phi_x = beta_dist.cdf(x, alpha + 1, beta)
+            
             variance = (alpha * beta) / ((alpha + beta)**2 * (alpha + beta + 1))
+            mean = alpha / (alpha + beta)
             
-            # Estimate expected proportion of near-zero values
-            p_low = betainc(alpha, beta, 0.05)  # P(X < 0.05)
+            # Estimate proportion of low values
+            p_low = beta_dist.cdf(0.05, alpha, beta)
             
-            logger.info(f"  Verification: target y={y0:.4f}, actual y={actual_y:.4f}")
-            logger.info(f"  Variance={variance:.6f}, P(X<0.05)={p_low:.4f}")
+            logger.info(f"  Verification at x={x:.4f}:")
+            logger.info(f"    F(x) target={x0:.4f}, actual={F_x:.4f}, error={abs(F_x-x0):.6f}")
+            logger.info(f"    φ(x) target={y0:.4f}, actual={Phi_x:.4f}, error={abs(Phi_x-y0):.6f}")
+            logger.info(f"  Distribution: mean={mean:.4f}, variance={variance:.6f}, P(X<0.05)={p_low:.4f}")
         except Exception as e:
             logger.warning(f"  Verification failed: {e}")
     
