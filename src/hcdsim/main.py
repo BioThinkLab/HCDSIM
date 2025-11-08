@@ -2311,16 +2311,23 @@ class HCDSIM:
         
         with Pool(processes=self.thread) as pool:
             pool.starmap(utils.runcmd, tasks)
-
+    
         # merge all temp bam files
+        # write all temp bam files to a text file
+        temp_bam_list_file = os.path.join(dtmp, f"{cell}_{mode}_temp_bam_list.txt")
+        with open(temp_bam_list_file, 'w') as f:
+            for temp_bam_file in temp_bam_files:
+                f.write(temp_bam_file + '\n')
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        merge_command = "{0} merge -@ {1} -f {2} {3}".format(self.samtools, self.thread, cell_bam_file, ' '.join(temp_bam_files))
+        merge_command = "{0} merge -@ {1} -f -b {2} {3}".format(self.samtools, self.thread, temp_bam_file, cell_bam_file)
         utils.runcmd(merge_command, samtools_log)
 
         # clean temp bam files
         for temp_bam_file in temp_bam_files:
             if os.path.exists(temp_bam_file):
                 os.remove(temp_bam_file)
+        if os.path.exists(temp_bam_list_file):
+            os.remove(temp_bam_list_file)
         self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
         
     def _process_cell_bam(self, job):
