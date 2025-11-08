@@ -2319,7 +2319,7 @@ class HCDSIM:
             for temp_bam_file in temp_bam_files:
                 f.write(temp_bam_file + '\n')
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        merge_command = "{0} merge -@ {1} -f -b {2} {3}".format(self.samtools, self.thread, temp_bam_file, cell_bam_file)
+        merge_command = "{0} merge -@ {1} -f -b {2} {3}".format(self.samtools, self.thread, temp_bam_list_file, cell_bam_file)
         utils.runcmd(merge_command, samtools_log)
 
         # clean temp bam files
