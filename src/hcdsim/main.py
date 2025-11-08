@@ -2305,7 +2305,7 @@ class HCDSIM:
         if len(temp_merged) == 1:
             os.rename(temp_merged[0], output_file)
         else:
-            final_merge_cmd = "{0} merge -@ {1} -f -b {2} {3}".format(
+            final_merge_cmd = "{0} merge -@ {1} -f {2} {3}".format(
                 self.samtools, self.thread, output_file, ' '.join(temp_merged)
             )
             utils.runcmd(final_merge_cmd, samtools_log)
