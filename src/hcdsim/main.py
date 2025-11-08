@@ -2629,11 +2629,6 @@ class HCDSIM:
         # load object from file
         root = random_tree.load_tree_from_file(tree_json)
         all_clones = random_tree.collect_all_nodes(root)
-        
-        # check bam file for each clone
-        for clone in all_clones:
-            clone_bam_file = os.path.join(dclone, clone.name + ".bam")
-            utils.check_exist(clone_bam_file=clone_bam_file)
 
         # assign cells for each clone and generating job list
         barcodes = []
