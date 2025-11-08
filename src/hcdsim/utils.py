@@ -15,6 +15,7 @@ import functools
 from scipy.stats import beta as beta_dist, norm
 from scipy.optimize import fsolve, newton_krylov, minimize
 from scipy.optimize.nonlin import NoConvergence
+from pyfaidx import Fasta
 
 # check part
 def check_exist(**params):
