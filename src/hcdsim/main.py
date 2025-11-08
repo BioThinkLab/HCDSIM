@@ -2281,7 +2281,7 @@ class HCDSIM:
     #     utils.runcmd(command, samtools_log)
     #     downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
 
-    def _merge_bams_in_batches(self, samtools_log, output_file, input_files, batch_size=1000):
+    def _merge_bams_in_batches(self, output_file, input_files, batch_size=1000):
         samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
         dtmp = os.path.join(self.outdir, 'tmp')
         temp_merged = []
