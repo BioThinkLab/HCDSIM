@@ -2288,7 +2288,7 @@ class HCDSIM:
         dcell = os.path.join(self.outdir, 'cell_bams')
         dtmp = os.path.join(self.outdir, 'tmp')
 
-        downsam_bar.progress(advance=False, msg="Downsampling cell bam for {}".format(cell))
+        self.log(f"Downsampling cell bam for {cell}", level='PROGRESS')
 
         clone_cnv_vector = np.array(clone_cnv)
         cell_cnv_vector = np.array(cell_cnv)
@@ -2321,9 +2321,8 @@ class HCDSIM:
         for temp_bam_file in temp_bam_files:
             if os.path.exists(temp_bam_file):
                 os.remove(temp_bam_file)
-                
-        downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell))
-
+        self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
+        
     def _process_cell_bam(self, job):
         (cell, dcell, dtmp, dlog) = job
 
