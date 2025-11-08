@@ -2293,6 +2293,7 @@ class HCDSIM:
         clone_cnv_vector = np.array(clone_cnv)
         cell_cnv_vector = np.array(cell_cnv)
         temp_bam_files = []
+        tasks = []
         for index, bin in enumerate(bins):
             clone_cnv_value = clone_cnv_vector[index]
             cell_cnv_value = cell_cnv_vector[index]
@@ -2304,11 +2305,13 @@ class HCDSIM:
             start, end = pos.split('-')
 
             temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
-            command = "{0} view -@ {1} -b -s {2} {3} {4} > {5}".format(self.samtools, self.thread, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
-            utils.runcmd(command, samtools_log)
-
+            command = "{0} view -b -s {2} {3} {4} > {5}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
+            tasks.append((command, samtools_log))
             temp_bam_files.append(temp_bam_file)
         
+        with Pool(processes=self.thread) as pool:
+            pool.starmap(utils.runcmd, tasks)
+
         # merge all temp bam files
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
         merge_command = "{0} merge -@ {1} -f {2} {3}".format(self.samtools, self.thread, cell_bam_file, ' '.join(temp_bam_files))
@@ -2661,16 +2664,18 @@ class HCDSIM:
                     barcodes.append(cell_name)
 
         # set parallel jobs for each cell
-        lock = Lock()
-        counter = Value('i', 0)
-        init_args = (lock, counter, len(jobs))
-        pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
+        # lock = Lock()
+        # counter = Value('i', 0)
+        # init_args = (lock, counter, len(jobs))
+        # pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
         
-        self.log('Downsampling cell bam...', level='PROGRESS')
-        for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
-            pass
-        pool.close()
-        pool.join()
+        # self.log('Downsampling cell bam...', level='PROGRESS')
+        # for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
+        #     pass
+        # pool.close()
+        # pool.join()
+        for job in jobs:
+            self._downsampling_cell_bam(job)
         
         # merge cell maternal and paternal bam file
         self.log('Merging maternal and paternal cell bam files...', level='PROGRESS')
