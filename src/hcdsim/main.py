@@ -2306,6 +2306,12 @@ class HCDSIM:
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
         merge_command = "{0} merge -@ {1} -f {2} {3}".format(self.samtools, self.thread, cell_bam_file, ' '.join(temp_bam_files))
         utils.runcmd(merge_command, samtools_log)
+
+        # clean temp bam files
+        for temp_bam_file in temp_bam_files:
+            if os.path.exists(temp_bam_file):
+                os.remove(temp_bam_file)
+                
         downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell))
 
     def _process_cell_bam(self, job):
