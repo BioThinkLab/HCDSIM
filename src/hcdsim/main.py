@@ -2305,7 +2305,7 @@ class HCDSIM:
             start, end = pos.split('-')
 
             temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
-            command = "{0} view -b -s {2} {3} {4} > {5}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
+            command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
             tasks.append((command, samtools_log))
             temp_bam_files.append(temp_bam_file)
         
