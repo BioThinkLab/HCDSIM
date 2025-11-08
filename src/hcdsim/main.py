@@ -2262,6 +2262,12 @@ class HCDSIM:
                 os.remove(tmp_file)
         os.rename(os.path.join(bam_dir, clone+"_maternal.sorted.bam"), os.path.join(bam_dir, clone+"_maternal.bam"))
         os.rename(os.path.join(bam_dir, clone+"_paternal.sorted.bam"), os.path.join(bam_dir, clone+"_paternal.bam"))
+
+        # index bam
+        command = "{0} index {1}".format(self.samtools, os.path.join(bam_dir, clone+"_maternal.bam"))
+        utils.runcmd(command, samtools_log)
+        command = "{0} index {1}".format(self.samtools,  os.path.join(bam_dir, clone+"_paternal.bam"))
+        utils.runcmd(command, samtools_log)
         align_bar.progress(advance=True, msg="Finish alignment process for {}".format(clone))
 
     # def _downsampling_cell_bam(self, job):
@@ -2300,6 +2306,7 @@ class HCDSIM:
             temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
             command = "{0} view -@ {1} -b -s {2} {3} {4} > {5}".format(self.samtools, self.thread, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
             utils.runcmd(command, samtools_log)
+
             temp_bam_files.append(temp_bam_file)
         
         # merge all temp bam files
