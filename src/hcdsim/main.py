@@ -2264,16 +2264,49 @@ class HCDSIM:
         os.rename(os.path.join(bam_dir, clone+"_paternal.sorted.bam"), os.path.join(bam_dir, clone+"_paternal.bam"))
         align_bar.progress(advance=True, msg="Finish alignment process for {}".format(clone))
 
+    # def _downsampling_cell_bam(self, job):
+    #     (ratio, clone_bam_file, cell_bam_file, log_dir) = job
+
+    #     samtools_log = os.path.join(log_dir, 'samtools_log.txt')
+    #     cell_name = os.path.splitext(os.path.basename(cell_bam_file))[0]
+
+    #     downsam_bar.progress(advance=False, msg="Downsampling cell bam for {}".format(cell_name))
+    #     command = "{0} view -@ {1} -b -s {2} {3} > {4}".format(self.samtools, self.thread, ratio, clone_bam_file, cell_bam_file)
+    #     utils.runcmd(command, samtools_log)
+    #     downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
+
     def _downsampling_cell_bam(self, job):
-        (ratio, clone_bam_file, cell_bam_file, log_dir) = job
+        (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
 
-        samtools_log = os.path.join(log_dir, 'samtools_log.txt')
-        cell_name = os.path.splitext(os.path.basename(cell_bam_file))[0]
+        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+        dcell = os.path.join(self.outdir, 'cell_bams')
+        dtmp = os.path.join(self.outdir, 'tmp')
 
-        downsam_bar.progress(advance=False, msg="Downsampling cell bam for {}".format(cell_name))
-        command = "{0} view -@ {1} -b -s {2} {3} > {4}".format(self.samtools, self.thread, ratio, clone_bam_file, cell_bam_file)
-        utils.runcmd(command, samtools_log)
-        downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
+        downsam_bar.progress(advance=False, msg="Downsampling cell bam for {}".format(cell))
+
+        clone_cnv_vector = np.array(clone_cnv)
+        cell_cnv_vector = np.array(cell_cnv)
+        temp_bam_files = []
+        for index, bin in enumerate(bins):
+            clone_cnv_value = clone_cnv_vector[index]
+            cell_cnv_value = cell_cnv_vector[index]
+            if clone_cnv_value == 0 or cell_cnv_value == 0:
+                continue
+            ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
+
+            chrom, pos = bin.split(':')
+            start, end = pos.split('-')
+
+            temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
+            command = "{0} view -@ {1} -b -s {2} {3} {4} > {5}".format(self.samtools, self.thread, f"{cell_index}.{ratio:.6f}", clone_bam_file, bin, temp_bam_file)
+            utils.runcmd(command, samtools_log)
+            temp_bam_files.append(temp_bam_file)
+        
+        # merge all temp bam files
+        cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+        merge_command = "{0} merge -@ {1} -f {2} {3}".format(self.samtools, self.thread, cell_bam_file, ' '.join(temp_bam_files))
+        utils.runcmd(merge_command, samtools_log)
+        downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell))
 
     def _process_cell_bam(self, job):
         (cell, dcell, dtmp, dlog) = job
@@ -2605,20 +2638,20 @@ class HCDSIM:
         # assign cells for each clone and generating job list
         barcodes = []
         jobs = []
-        clones = ['clone' + str(i) for i in range(1, self.clone_no)]
-        clones.append('normal')
-        assign_cells = utils.assign_cells_to_clones(self.cell_no, self.clone_no)
-        cell_ratio = round(self.cell_coverage/self.clone_coverage, 2)
-        for index, clone in enumerate(all_clones):
-            clone_cell_no = assign_cells[index]
-            clone_bam_file = os.path.join(dclone, clone.name + '.bam')
-            for i in range(clone_cell_no):
-                cell_name = clone.name + '_cell' + str(i+1)
-                barcodes.append(cell_name)
-                cell_bam_file = os.path.join(dcell, cell_name+'.bam')
-                ratio = cell_ratio + i
-                jobs.append((ratio, clone_bam_file, cell_bam_file, dlog))
-        
+        for mode in ['maternal', 'paternal']:
+            clone_cnv_df = pd.read_csv(os.path.join(dprofile, f'clone_{mode}_cna_matrix.csv'), index_col=0)
+            cell_cnv_df = pd.read_csv(os.path.join(dprofile, f'cell_{mode}_cna_matrix.csv'), index_col=0)
+            for clone in all_clones:
+                # downsample maternal and paternal bam file for each cell
+                clone_bam_file = os.path.join(dclone, f'{clone.name}_{mode}.bam')
+                clone_cnv = clone_cnv_df[f'{clone.name}_{mode}_cnas'].tolist()
+                bins = clone_cnv_df.index.tolist()
+                for i in range(clone.cell_no):
+                    cell_name = clone.name + '_cell' + str(i+1)
+                    cell_cnv = cell_cnv_df[cell_name].tolist()
+                    jobs.append((clone.name, cell_name, mode, clone_bam_file, clone_cnv, cell_cnv, bins, i))
+                    barcodes.append(cell_name)
+
         # set parallel jobs for each cell
         lock = Lock()
         counter = Value('i', 0)
@@ -2630,7 +2663,29 @@ class HCDSIM:
             pass
         pool.close()
         pool.join()
-
+        
+        # merge cell maternal and paternal bam file
+        self.log('Merging maternal and paternal cell bam files...', level='PROGRESS')
+        for cell in barcodes:
+            maternal_bam = os.path.join(dcell, f'{cell}_maternal.bam')
+            paternal_bam = os.path.join(dcell, f'{cell}_paternal.bam')
+            merged_bam = os.path.join(dcell, f'{cell}.bam')
+            samtools_log = os.path.join(dlog, 'samtools_log.txt')
+            command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, merged_bam, maternal_bam, paternal_bam)
+            utils.runcmd(command, samtools_log)
+            # index merged bam file
+            command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, merged_bam)
+            utils.runcmd(command, samtools_log)
+            # remove maternal and paternal bam files
+            # if os.path.exists(maternal_bam):
+            #     os.remove(maternal_bam)
+            # if os.path.exists(maternal_bam + '.bai'):
+            #     os.remove(maternal_bam + '.bai')
+            # if os.path.exists(paternal_bam):
+            #     os.remove(paternal_bam)
+            # if os.path.exists(paternal_bam + '.bai'):
+            #     os.remove(paternal_bam + '.bai')
+        
         self.log('Writing cell list to barcode.txt...', level='PROGRESS')
         barcodes_file = os.path.join(dprofile, 'barcodes.txt')
         with open(barcodes_file, 'w') as output:
