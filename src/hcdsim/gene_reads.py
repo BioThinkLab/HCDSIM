@@ -101,9 +101,8 @@ def lorenz_to_beta(x0, y0, logger=None):
     Convert a point on Lorenz curve to Beta distribution parameters
     
     Based on equations (1) and (2) in Mallory et al. 2020:
-    At x = α/(α+β):
-    F(α/(α+β)) = I_{α/(α+β)}(α, β) = x0
-    φ(α/(α+β)) = I_{α/(α+β)}(α+1, β) = y0
+    F(x) = I_x(α, β)
+    φ(x) = I_x(α+1, β)
     
     Parameters:
         x0: X-coordinate on Lorenz curve (cumulative proportion of bins)
@@ -112,11 +111,6 @@ def lorenz_to_beta(x0, y0, logger=None):
     Returns:
         (alpha, beta): Parameters for Beta distribution
     """
-    from scipy.stats import beta as beta_dist
-    from scipy.optimize import newton_krylov, fsolve
-    from scipy.optimize.nonlin import NoConvergence
-    import numpy as np
-    
     if logger:
         logger.info(f"Converting Lorenz({x0}, {y0}) to Beta distribution...")
     
@@ -141,16 +135,12 @@ def lorenz_to_beta(x0, y0, logger=None):
             return [1e10, 1e10]
         
         try:
-            # The key point: x is defined as α/(α+β)
-            x = alpha / (alpha + beta)
+            # Find x value from inverse regularized incomplete beta function
+            x = betaincinv(alpha, beta, x0)
             
-            # Equation 1: CDF at x with parameters (α, β)
-            F_x = beta_dist.cdf(x, alpha, beta)
-            eq1 = F_x - x0
-            
-            # Equation 2: CDF at x with parameters (α+1, β)
-            Phi_x = beta_dist.cdf(x, alpha + 1, beta)
-            eq2 = Phi_x - y0
+            # Check constraints
+            eq1 = betainc(alpha, beta, x) - x0
+            eq2 = betainc(alpha + 1, beta, x) - y0
             
             return [eq1, eq2]
         except:
@@ -187,25 +177,14 @@ def lorenz_to_beta(x0, y0, logger=None):
         init_alpha = max(0.2, min(init_alpha, max_alpha_beta / 2))
         
         try:
-            sol = newton_krylov(
-                equations, 
-                guess, 
-                method='lgmres', 
-                verbose=0, 
-                rdiff=0.1, 
-                maxiter=50
-            )
+            solution = fsolve(equations, [init_alpha, init_alpha], full_output=True)
+            params, info, ier, msg = solution
             
-            alpha, beta = sol[0], sol[1]
-            
-            # Validate solution
-            if alpha > 0 and beta > 0:
-                # Verify the solution
-                x = alpha / (alpha + beta)
-                F_x = beta_dist.cdf(x, alpha, beta)
-                Phi_x = beta_dist.cdf(x, alpha + 1, beta)
+            if ier == 1:  # Solution converged
+                alpha, beta = params
                 
-                error = abs(F_x - x0) + abs(Phi_x - y0)
+                # Calculate error
+                error = sum([e**2 for e in info['fvec']])
                 
                 # Validate solution
                 if alpha > 0 and beta > 0 and alpha + beta <= max_alpha_beta:
@@ -214,33 +193,32 @@ def lorenz_to_beta(x0, y0, logger=None):
                         x = betaincinv(alpha, beta, x0)
                         actual_y = betainc(alpha + 1, beta, x)
                         
-                        if error < best_error:
+                        # Accept if error is small
+                        if abs(actual_y - y0) < 0.01 and error < best_error:
                             best_error = error
                             best_solution = (alpha, beta)
-            except:
-                continue
-        
-        if best_solution is not None and best_error < 0.01:
-            solution = best_solution
-            if logger:
-                logger.info(f"  Converged with fsolve")
+                    except:
+                        continue
+        except:
+            continue
     
-    # Method 3: Last resort - bounded optimization
-    if solution is None:
+    # If no good solution found, use fallback with relaxed constraints
+    if best_solution is None:
         if logger:
-            logger.warning(f"  Both newton_krylov and fsolve failed, using bounded optimization...")
+            logger.warning(f"  Primary solver failed, using fallback method...")
         
+        # Fallback: use bounded optimization
         from scipy.optimize import minimize
         
-        def objective(P):
-            alpha, beta = P[0], P[1]
+        def objective(params):
+            alpha, beta = params
             if alpha <= 0 or beta <= 0:
                 return 1e10
             
             try:
-                x = alpha / (alpha + beta)
-                F_x = beta_dist.cdf(x, alpha, beta)
-                Phi_x = beta_dist.cdf(x, alpha + 1, beta)
+                x = betaincinv(alpha, beta, x0)
+                err1 = (betainc(alpha, beta, x) - x0)**2
+                err2 = (betainc(alpha + 1, beta, x) - y0)**2
                 
                 # Stronger penalty for extreme parameters
                 penalty = 0
@@ -260,13 +238,15 @@ def lorenz_to_beta(x0, y0, logger=None):
         
         result = minimize(
             objective,
-            [init_alpha, init_alpha],
+            [initial_alpha, initial_alpha],
             method='L-BFGS-B',
             bounds=[(0.1, upper_bound), (0.1, upper_bound)]
         )
         
         if result.success and result.fun < 1.0:
-            solution = tuple(result.x)
+            best_solution = tuple(result.x)
+        else:
+            # Last resort: use simple symmetric distribution
             if logger:
                 logger.warning(f"  Fallback optimization failed, using approximate solution...")
             
@@ -279,29 +259,20 @@ def lorenz_to_beta(x0, y0, logger=None):
             approx_alpha = max(0.2, min(approx_alpha, max_alpha_beta / 2))
             best_solution = (approx_alpha, approx_alpha)
     
-    # Final validation and error handling
-    if solution is None:
-        error_msg = f"Failed to find valid Beta parameters for Lorenz({x0}, {y0})"
-        if logger:
-            logger.error(f"  {error_msg}")
-        raise ValueError(error_msg)
+    alpha, beta = best_solution
     
-    alpha, beta = solution
-    
+    # Final validation
     if alpha <= 0 or beta <= 0:
         raise ValueError(f"Invalid Beta parameters: α={alpha}, β={beta}")
     
-    # Log results and diagnostics
     if logger:
         logger.info(f"  Beta(α={alpha:.4f}, β={beta:.4f}), α+β={alpha+beta:.4f}")
         logger.info(f"  Constraint: α+β ≤ {max_alpha_beta:.1f}")
         
+        # Log diagnostic information
         try:
-            # Verify the solution
-            x = alpha / (alpha + beta)
-            F_x = beta_dist.cdf(x, alpha, beta)
-            Phi_x = beta_dist.cdf(x, alpha + 1, beta)
-            
+            x = betaincinv(alpha, beta, x0)
+            actual_y = betainc(alpha + 1, beta, x)
             variance = (alpha * beta) / ((alpha + beta)**2 * (alpha + beta + 1))
             
             # Estimate expected proportion of near-zero values
