@@ -2281,6 +2281,38 @@ class HCDSIM:
     #     utils.runcmd(command, samtools_log)
     #     downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
 
+    def _merge_bams_in_batches(self, samtools_log, output_file, input_files, batch_size=1000):
+        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+        dtmp = os.path.join(self.outdir, 'tmp')
+        temp_merged = []
+        
+        for i in range(0, len(input_files), batch_size):
+            batch = input_files[i:i+batch_size]
+            temp_output = os.path.join(dtmp, f"temp_merged_{i}.bam")
+            temp_bam_list_file = os.path.join(dtmp, f"temp_{i}_bam_list.txt")
+
+            with open(temp_bam_list_file, 'w') as f:
+                for temp_bam_file in batch:
+                    f.write(temp_bam_file + '\n')
+            merge_cmd = "{0} merge -@ {1} -f -b {2} {3}".format(
+                self.samtools, self.thread, temp_bam_list_file, temp_output
+            )
+            utils.runcmd(merge_cmd, samtools_log)
+            temp_merged.append(temp_output)
+            if os.path.exists(temp_bam_list_file):
+                os.remove(temp_bam_list_file)
+        
+        if len(temp_merged) == 1:
+            os.rename(temp_merged[0], output_file)
+        else:
+            final_merge_cmd = "{0} merge -@ {1} -f -b {2} {3}".format(
+                self.samtools, self.thread, output_file, ' '.join(temp_merged)
+            )
+            utils.runcmd(final_merge_cmd, samtools_log)
+            
+            for f in temp_merged:
+                os.remove(f)
+
     def _downsampling_cell_bam(self, job):
         (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
 
@@ -2314,20 +2346,15 @@ class HCDSIM:
     
         # merge all temp bam files
         # write all temp bam files to a text file
-        temp_bam_list_file = os.path.join(dtmp, f"{cell}_{mode}_temp_bam_list.txt")
-        with open(temp_bam_list_file, 'w') as f:
-            for temp_bam_file in temp_bam_files:
-                f.write(temp_bam_file + '\n')
+        
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        merge_command = "{0} merge -@ {1} -f -b {2} {3}".format(self.samtools, self.thread, temp_bam_list_file, cell_bam_file)
-        utils.runcmd(merge_command, samtools_log)
+        self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
 
         # clean temp bam files
         for temp_bam_file in temp_bam_files:
             if os.path.exists(temp_bam_file):
                 os.remove(temp_bam_file)
-        if os.path.exists(temp_bam_list_file):
-            os.remove(temp_bam_list_file)
+        
         self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
         
     def _process_cell_bam(self, job):
