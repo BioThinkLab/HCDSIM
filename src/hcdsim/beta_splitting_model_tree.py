@@ -412,63 +412,50 @@ def balance_tree(root, balance_factor=0.8):
     # Update depths after pruning
     update_depths(root)
 
-def assign_cells_proportional(root, total_cells):
+def assign_cells_to_all_nodes(root, cell_num):
     """
-    Assign cells to all nodes proportionally to their interval size.
+    Assign cells to all nodes of the tree, not just leaves.
     
     Parameters:
-    - root: Root of the tree
-    - total_cells: Total number of cells to distribute
+    - root: Root node of the tree
+    - cell_num: Total number of cells to distribute
+    
+    Returns:
+    - Updated tree with cell_no assigned to all nodes
     """
-    # We only assign cells to clone nodes (not the normal root)
-    clone_nodes = collect_all_nodes(root, mode=0)
-    if not clone_nodes:
-        if root.name == "normal": # If only root exists
-             root.cell_no = total_cells
-        return
-
-    # Calculate weights based on interval size and depth
+    # Collect all nodes in the tree iteratively
+    all_nodes = []
+    queue = [root]
+    
+    while queue:
+        node = queue.pop(0)
+        all_nodes.append(node)
+        queue.extend(node.children)
+    
+    # Assign cells proportionally to all nodes, with more cells to deeper nodes
+    # Calculate weighted distribution based on depth
+    total_weight = 0
     weights = []
-    for node in clone_nodes:
-        interval_size = node.interval[1] - node.interval[0]
-        # Give slight preference to deeper nodes (more evolved)
-        depth_weight = 1.0 + node.depth * 0.1
-        weight = interval_size * depth_weight
+    
+    for node in all_nodes:
+        # Give higher weight to deeper nodes (more evolved clones)
+        weight = 1.0 + node.depth * 0.5
         weights.append(weight)
+        total_weight += weight
     
-    total_weight = sum(weights)
+    # Distribute cells based on weights
+    remaining_cells = cell_num
+    for i, node in enumerate(all_nodes):
+        # Calculate cell allocation proportionally
+        node_cells = int((weights[i] / total_weight) * cell_num)
+        node.cell_no = node_cells
+        remaining_cells -= node_cells
     
-    if total_weight == 0: # Avoid division by zero if all weights are 0
-        # Assign cells equally
-        for i, node in enumerate(clone_nodes):
-            node.cell_no = total_cells // len(clone_nodes)
-        # Distribute remainder
-        for i in range(total_cells % len(clone_nodes)):
-            clone_nodes[i].cell_no += 1
-        return
-
-    # Distribute cells
-    assigned_cells = 0
-    for i, node in enumerate(clone_nodes):
-        proportion = weights[i] / total_weight
-        cell_count = max(1, int(proportion * total_cells)) # Ensure every clone gets at least one cell
-        node.cell_no = cell_count
-        assigned_cells += cell_count
+    # Distribute any remaining cells due to rounding
+    for i in range(remaining_cells):
+        all_nodes[i % len(all_nodes)].cell_no += 1
     
-    # Distribute remaining/reclaim excess cells to match total_cells
-    difference = total_cells - assigned_cells
-    if difference > 0:
-        # Distribute remaining cells one by one to nodes with largest weights
-        sorted_nodes = sorted(zip(weights, clone_nodes), key=lambda x: x[0], reverse=True)
-        for i in range(difference):
-            sorted_nodes[i % len(sorted_nodes)][1].cell_no += 1
-    elif difference < 0:
-        # Reclaim excess cells one by one from nodes with more than 1 cell
-        sorted_nodes = sorted(clone_nodes, key=lambda n: n.cell_no, reverse=True)
-        for i in range(abs(difference)):
-            node_to_reduce = sorted_nodes[i % len(sorted_nodes)]
-            if node_to_reduce.cell_no > 1:
-                node_to_reduce.cell_no -= 1
+    return root
 
 def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, 
                       treedepth=4, treedepthsigma=0.5, max_children=3, 
@@ -541,7 +528,7 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0,
         # Avoid balancing on the fallback tree to ensure clone count.
     
     # Final Step: Assign cells to the chosen tree.
-    assign_cells_proportional(best_tree, cell_num)
+    assign_cells_to_all_nodes(best_tree, cell_num)
     
     return best_tree
 
@@ -713,7 +700,7 @@ def load_tree_from_newick(newick_string, cell_num=1000):
     update_depths(root)
     
     # Assign cells proportionally to all clone nodes
-    assign_cells_proportional(root, cell_num)
+    assign_cells_to_all_nodes(root, cell_num)
     
     return root
 
