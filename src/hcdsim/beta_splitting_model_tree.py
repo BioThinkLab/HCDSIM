@@ -752,9 +752,8 @@ def tree_to_newick(node):
                 child_strs = [node_strings[child.name] for child in current.children if child.name in node_strings]
                 result = f"({','.join(child_strs)}){current.name}"
             
-            # Add edge length if available and non-zero
-            if current.parent: # Root has no parent, so no incoming edge length
-                result += f":{current.cell_no}cells"
+            # Add cell no
+            result += f":{current.cell_no}cells"
 
             node_strings[current.name] = result
             processed.add(current.name)
