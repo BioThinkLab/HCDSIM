@@ -2336,17 +2336,35 @@ class HCDSIM:
             chrom, pos = bin.split(':')
             start, end = pos.split('-')
 
-            temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
-            command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
-            tasks.append((command, samtools_log))
-            temp_bam_files.append(temp_bam_file)
+            if ratio <=1:
+                temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
+                command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
+                tasks.append((command, samtools_log))
+                temp_bam_files.append(temp_bam_file)
+            else:
+                full_copies = int(ratio)  
+                fractional_part = ratio - full_copies
+                
+                for i in range(full_copies):
+                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_copy{i}.bam")
+                    command = "{0} view -b {1} {2} > {3}".format(
+                        self.samtools, clone_bam_file, bin, temp_bam)
+                    utils.runcmd(command, samtools_log)
+                    temp_bam_files.append(temp_bam)
+                
+                if fractional_part > 0:
+                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_frac.bam")
+                    random_seed = cell_index + fractional_part + full_copies
+                    command = "{0} view -b -s {1} {2} {3} > {4}".format(
+                        self.samtools, random_seed, clone_bam_file, bin, temp_bam)
+                    utils.runcmd(command, samtools_log)
+                    temp_bam_files.append(temp_bam)                
         
         with Pool(processes=self.thread) as pool:
             pool.starmap(utils.runcmd, tasks)
     
         # merge all temp bam files
         # write all temp bam files to a text file
-        
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
         self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
 
