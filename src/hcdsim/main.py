@@ -73,7 +73,7 @@ class HCDSIM:
                 cell_coverage: float = 0.5, 
                 reads_len: int = 150, 
                 insertion_size: int = 350, 
-                error_rate: float = 0.0, 
+                error_rate: float = 0.02, 
                 wgd: bool = False,
                 chrom_cna_no: int = 2,
                 chrom_arm_rate: float = 0.75,

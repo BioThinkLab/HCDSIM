@@ -783,7 +783,7 @@ def tree_to_newick(node):
     # Let's adjust for the standard where the root might be implicit or explicit.
     final_str = node_strings[node.name]
     if not node.children:
-        return f"{node.name}:{node.edge_length:.6f};"
+        return f"{node.name}:{node.cell_no};"
     
     # For a tree, the final string is just the root's representation + semicolon
     return final_str + ";"
