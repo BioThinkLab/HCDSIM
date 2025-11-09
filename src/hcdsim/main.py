@@ -59,7 +59,8 @@ class HCDSIM:
                 max_tree_depth: int = 4, 
                 tree_depth_sigma: float = 0.5, 
                 max_node_children: int = 4, 
-                tree_balance_factor: float = 0.8, 
+                tree_balance_factor: float = 0.8,
+                tree_newwick: str = None,
                 random_seed: int = None,
                 bin_size: str = '100kb', 
                 snp_ratio: float = 0.001, 
@@ -2495,8 +2496,15 @@ class HCDSIM:
         tree_json = os.path.join(dprofile, 'tree.json')
 
         # generate random clone tree and set root as normal clone
-        self.log('Generating random cell-lineage tree...', level='PROGRESS')
-        root = random_tree.generate_tree_beta(cell_num=self.cell_no, num_clones=self.clone_no, alpha=self.tree_alpha, beta=self.tree_beta, treedepth=self.max_tree_depth, treedepthsigma=self.tree_depth_sigma, max_children=self.max_node_children, balance_factor=self.tree_balance_factor)
+        if self.tree_newwick and os.path.exists(self.tree_newwick):
+            self.log('Loading tree from newick file: {}'.format(self.tree_newwick), level='PROGRESS')
+            newwick_str = ''
+            with open(self.tree_newwick, 'r') as f:
+                newick_string = f.read()
+            root = random_tree.load_tree_from_newick(newick_string)
+        else:
+            self.log('Generating random cell-lineage tree...', level='PROGRESS')
+            root = random_tree.generate_tree_beta(cell_num=self.cell_no, num_clones=self.clone_no, alpha=self.tree_alpha, beta=self.tree_beta, treedepth=self.max_tree_depth, treedepthsigma=self.tree_depth_sigma, max_children=self.max_node_children, balance_factor=self.tree_balance_factor)
 
         self.log('Writing tree to file with newick format...', level='PROGRESS')
         result = random_tree.tree_to_newick(root)
