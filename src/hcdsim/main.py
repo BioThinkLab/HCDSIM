@@ -690,7 +690,7 @@ class HCDSIM:
                 # if include wgd, set one clone to wgd
                 if self.wgd and not wgd_flag:
                     if self.max_ploidy:
-                        cna_copies = self.max_ploidy
+                        cna_copies = int(self.max_ploidy/2)
                     else:
                         cna_copies = np.clip(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value/2)
                     
