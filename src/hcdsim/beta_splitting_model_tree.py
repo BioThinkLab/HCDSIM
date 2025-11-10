@@ -774,6 +774,40 @@ def tree_to_newick(node):
     # For a tree, the final string is just the root's representation + semicolon
     return final_str + ";"
 
+def update_node_in_tree(root, new_node):
+    """
+    Update a node in the tree with the same name as the new_node.
+    If a match is found, the node in the tree is updated with new_node's attributes.
+
+    :param root: The root of the tree.
+    :param new_node: The new node to update.
+    :return: The updated root of the tree.
+    """
+    def dfs(node):
+        if node.name == new_node.name:
+            node.children = new_node.children
+            node.maternal_cnas = new_node.maternal_cnas
+            node.paternal_cnas = new_node.paternal_cnas
+            node.maternal_fasta = new_node.maternal_fasta
+            node.paternal_fasta = new_node.paternal_fasta
+            node.fasta = new_node.fasta
+            node.maternal_fasta_length = new_node.maternal_fasta_length
+            node.paternal_fasta_length = new_node.paternal_fasta_length
+            node.parent = new_node.parent
+            node.ratio = new_node.ratio
+            node.cell_no = new_node.cell_no
+            node.depth = new_node.depth
+            node.changes = new_node.changes
+            node.cna_status = new_node.cna_status
+
+            return True
+        for child in node.children:
+            if dfs(child):
+                return True
+        return False
+
+    dfs(root)
+    return root
 
 def main():
     """Main function to parse arguments and generate the tree"""
