@@ -1047,13 +1047,13 @@ class HCDSIM:
                     # Handle whole chromosome-level CNA
                     elif cna_type == "whole-chrom-cna":
                         # Generate maternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, self.cna_prob):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             m_cna = 0
                         else:  # Duplication
                             m_cna = np.random.geometric(self.cna_copy_param)
 
                         # Generate paternal CNA: decide whether it's deletion or duplication
-                        if np.random.binomial(1, self.cna_prob):  # Deletion
+                        if np.random.binomial(1, self.del_prob):  # Deletion
                             p_cna = 0
                         else:  # Duplication
                             p_cna = np.random.geometric(self.cna_copy_param)
@@ -2136,7 +2136,7 @@ class HCDSIM:
         utils.runcmd(cmd, samtools_log)
 
         # Build wgsim command
-        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,n_reads,self.reads_len,temp_fasta,temp_fq1,temp_fq2)
+        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -S {4} -r0 -R0 -X0 {5} {6} {7}".format(self.error_rate,self.insertion_size,n_reads,self.reads_len,bin_idx,temp_fasta,temp_fq1,temp_fq2)
         utils.runcmd(command, wgsim_log)
         if os.path.exists(temp_fasta):
             os.remove(temp_fasta)
