@@ -791,19 +791,11 @@ class HCDSIM:
                         
                         # Check if we've exceeded total bins
                         if idx >= total_bin_lens:
-                            can_place = False
                             break
                         
                         # Check if we've crossed chromosome boundary
                         if ref['Chromosome'][idx] != start_chrom:
-                            # If crossed chromosome, check if the portion before crossing has more than 1 bin
-                            if j > 1:
-                                # Update num_windows_span to the number of bins before crossing
-                                num_windows_span = j
-                                break
-                            else:
-                                can_place = False
-                                break
+                           break
                         
                         # Check if position is already occupied
                         if clone.cna_status[idx] is not None:
@@ -841,19 +833,11 @@ class HCDSIM:
                                 
                                 # Check if we've exceeded total bins
                                 if idx >= total_bin_lens:
-                                    can_place = False
                                     break
                                 
                                 # Check if we've crossed chromosome boundary
                                 if ref['Chromosome'][idx] != start_chrom:
-                                    # If crossed chromosome, check if the portion before crossing has more than 1 bin
-                                    if j > 1:
-                                        # Update num_windows_span to the number of bins before crossing
-                                        num_windows_span = j
-                                        break
-                                    else:
-                                        can_place = False
-                                        break
+                                    break
                                 
                                 # Check if position is already occupied
                                 if clone.cna_status[idx] is not None:
@@ -1218,19 +1202,11 @@ class HCDSIM:
                                 
                                 # Check if we've exceeded total bins
                                 if idx >= total_bin_lens:
-                                    can_place = False
                                     break
                                 
                                 # Check if we've crossed chromosome boundary
                                 if ref['Chromosome'][idx] != start_chrom:
-                                    # If crossed chromosome, check if the portion before crossing has more than 1 bin
-                                    if j > 1:
-                                        # Update num_windows_span to the number of bins before crossing
-                                        num_windows_span = j
-                                        break
-                                    else:
-                                        can_place = False
-                                        break
+                                    break
                                 
                                 span_indices.append(idx)
                             
@@ -1325,19 +1301,11 @@ class HCDSIM:
                                 
                                 # Check if we've exceeded total bins
                                 if idx >= total_bin_lens:
-                                    can_place = False
                                     break
                                 
                                 # Check if we've crossed chromosome boundary
                                 if ref['Chromosome'][idx] != start_chrom:
-                                    # If crossed chromosome, check if the portion before crossing has more than 1 bin
-                                    if j > 1:
-                                        # Update num_windows_span to the number of bins before crossing
-                                        num_windows_span = j
-                                        break
-                                    else:
-                                        can_place = False
-                                        break
+                                    break
                                 
                                 # Check if position has already been modified or was modified in parent
                                 if clone.cna_status[idx] != parent.cna_status[idx] or parent.cna_status[idx] is not None:
@@ -1374,19 +1342,11 @@ class HCDSIM:
                                         
                                         # Check if we've exceeded total bins
                                         if idx >= total_bin_lens:
-                                            can_place = False
                                             break
                                         
                                         # Check if we've crossed chromosome boundary
                                         if ref['Chromosome'][idx] != start_chrom:
-                                            # If crossed chromosome, check if the portion before crossing has more than 1 bin
-                                            if j > 1:
-                                                # Update num_windows_span to the number of bins before crossing
-                                                num_windows_span = j
-                                                break
-                                            else:
-                                                can_place = False
-                                                break
+                                            break
                                         
                                         # Check if position has already been modified or was modified in parent
                                         if clone.cna_status[idx] != parent.cna_status[idx] or parent.cna_status[idx] is not None:
@@ -1724,11 +1684,15 @@ class HCDSIM:
                         span_indices = []
                         
                         for j in range(num_windows_span):
+                            start_chrom = ref['Chromosome'][start_idx]
                             potential_idx = start_idx + j
                             if potential_idx >= total_bin_lens:
-                                can_place = False
                                 break
                             
+                            # Check if we've crossed chromosome boundary
+                            if ref['Chromosome'][potential_idx] != start_chrom:
+                                break
+
                             # Check if this position is available (unmutated in clone and not yet assigned)
                             if (clone.maternal_cnas[potential_idx] != 1 or 
                                 clone.paternal_cnas[potential_idx] != 1 or
@@ -1741,7 +1705,7 @@ class HCDSIM:
                         if can_place and len(span_indices) > 0:
                             # Mark these positions as having a CNA
                             for idx in span_indices:
-                                cell_cna_status[idx] = ("cna", num_windows_span, cna_event_id)
+                                cell_cna_status[idx] = ("cna", len(span_indices), cna_event_id)
                             
                             # Generate maternal CNA: deletion or duplication
                             if np.random.binomial(1, self.del_prob):  # Deletion
