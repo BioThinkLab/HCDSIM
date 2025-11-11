@@ -1100,13 +1100,13 @@ class HCDSIM:
                         if np.random.binomial(1, self.del_prob):  # Deletion
                             m_cna = 0
                         else:  # Duplication
-                            m_cna = min(np.random.geometric(self.cna_copy_param), 10)
+                            m_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value/2))
 
                         # Generate paternal CNA: decide whether it's deletion or duplication
                         if np.random.binomial(1, self.del_prob):  # Deletion
                             p_cna = 0
                         else:  # Duplication
-                            p_cna = min(np.random.geometric(self.cna_copy_param), 10)
+                            p_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value/2))
 
                         # Ensure at least one allele has mutated (not both equal to 1)
                         if m_cna == 1 and p_cna == 1:
