@@ -1553,7 +1553,6 @@ class HCDSIM:
         
         while queue:
             clone = queue.popleft()
-            
             # Determine number of cells with and without mutations
             total_cells = clone.cell_no
             cell_id_counter = 1
@@ -1572,8 +1571,11 @@ class HCDSIM:
                     'changes': [],
                     'has_mutation': False
                 }
-            
-            is_wgd = any('wgd' in status for status in clone.cna_status if status is not None)
+                
+            if clone.cna_status is not None:
+                is_wgd = any('wgd' in status for status in clone.cna_status if status is not None)
+            else:
+                is_wgd = False
 
             # Generate mutated cells
             for i in range(mutated_cell_count):
@@ -1586,10 +1588,16 @@ class HCDSIM:
                 cell_changes = []
                 
                 # Find available indices where clone has no CNA (copy number = 1 for both alleles)
-                available_indices = [
-                    idx for idx in range(total_bin_lens) 
-                    if clone.maternal_cnas[idx] == 1 and clone.paternal_cnas[idx] == 1
-                ]
+                if is_wgd:
+                    available_indices = [
+                        idx for idx in range(total_bin_lens) 
+                        if clone.cna_status[idx] != 'post-wgd-dup'
+                    ]
+                else:
+                    available_indices = [
+                        idx for idx in range(total_bin_lens) 
+                        if (clone.cna_status is None) or (clone.maternal_cnas[idx] == 1 and clone.paternal_cnas[idx] == 1 and clone.cna_status[idx] is None)
+                    ]
                 
                 if len(available_indices) == 0:
                     # No available positions for mutation, cell inherits clone profile
@@ -1638,13 +1646,13 @@ class HCDSIM:
 
                             # Check if this position is available (unmutated in clone and not yet assigned)
                             if is_wgd:
-                                if cell_cna_status[potential_idx] == 'post-wgd-dup':
+                                if clone.cna_status[potential_idx] == 'post-wgd-dup':
                                     can_place = False
                                     break
                             else:
                                 if (clone.maternal_cnas[potential_idx] != 1 or 
-                                    clone.paternal_cnas[potential_idx] != 1 or
-                                    cell_cna_status[potential_idx] is not None):
+                                    clone.paternal_cnas[potential_idx] != 1 or 
+                                    (clone.cna_status is not None and clone.cna_status[potential_idx] is not None)):
                                     can_place = False
                                     break
                             
@@ -2495,7 +2503,7 @@ class HCDSIM:
 
         # generate normal fasta with snps 
         self.log("Building reference fasta file with SNPs data...", level='PROGRESS')
-        self._buildGenome(m_fasta, p_fasta, allele_phase_file) 
+        # self._buildGenome(m_fasta, p_fasta, allele_phase_file) 
 
         # generate cna for each clone
         self.log('Generating CNV profile for each clone...', level='PROGRESS')
