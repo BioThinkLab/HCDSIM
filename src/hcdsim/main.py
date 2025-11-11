@@ -2503,7 +2503,7 @@ class HCDSIM:
 
         # generate normal fasta with snps 
         self.log("Building reference fasta file with SNPs data...", level='PROGRESS')
-        # self._buildGenome(m_fasta, p_fasta, allele_phase_file) 
+        self._buildGenome(m_fasta, p_fasta, allele_phase_file) 
 
         # generate cna for each clone
         self.log('Generating CNV profile for each clone...', level='PROGRESS')
