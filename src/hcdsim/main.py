@@ -1139,7 +1139,7 @@ class HCDSIM:
                     clone.paternal_cnas.append(parent.paternal_cnas[i])
                
                 # Check if parent is WGD
-                parent_is_wgd = any(status == 'wgd' for status in parent.cna_status if status is not None)
+                parent_is_wgd = any('wgd' in status for status in parent.cna_status if status is not None)
                 
                 cna_event_id = max([status[2] for status in parent.cna_status if isinstance(status, tuple)], default=0) + 1
                 
@@ -1573,6 +1573,8 @@ class HCDSIM:
                     'has_mutation': False
                 }
             
+            is_wgd = any('wgd' in status for status in clone.cna_status if status is not None)
+
             # Generate mutated cells
             for i in range(mutated_cell_count):
                 cell_id = f"{clone.name}_cell{cell_id_counter}"
@@ -1613,7 +1615,7 @@ class HCDSIM:
                     start_idx = available_indices[i]
                     
                     # Decide whether to place a CNA here
-                    if clone.name == 'normal':
+                    if clone.name == 'normal' or is_wgd:
                         temp_prob = np.random.binomial(1, self.cna_prob * 0.02)
                     else:
                         temp_prob = np.random.binomial(1, self.cna_prob * 0.1)
@@ -1635,11 +1637,16 @@ class HCDSIM:
                                 break
 
                             # Check if this position is available (unmutated in clone and not yet assigned)
-                            if (clone.maternal_cnas[potential_idx] != 1 or 
-                                clone.paternal_cnas[potential_idx] != 1 or
-                                cell_cna_status[potential_idx] is not None):
-                                can_place = False
-                                break
+                            if is_wgd:
+                                if cell_cna_status[potential_idx] == 'post-wgd-dup':
+                                    can_place = False
+                                    break
+                            else:
+                                if (clone.maternal_cnas[potential_idx] != 1 or 
+                                    clone.paternal_cnas[potential_idx] != 1 or
+                                    cell_cna_status[potential_idx] is not None):
+                                    can_place = False
+                                    break
                             
                             span_indices.append(potential_idx)
                         
@@ -1647,21 +1654,37 @@ class HCDSIM:
                             # Mark these positions as having a CNA
                             for idx in span_indices:
                                 cell_cna_status[idx] = ("cna", len(span_indices), cna_event_id)
-                            
-                            # Generate maternal CNA: deletion or duplication
-                            if np.random.binomial(1, self.del_prob):  # Deletion
-                                m_cna = 0
-                            else:  # Duplication
-                                m_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value))
-                            
-                            # Paternal CNA: deletion or duplication
-                            if np.random.binomial(1, self.del_prob):  # Deletion
-                                p_cna = 0
-                            else:  # Duplication
-                                if m_cna == 1:
-                                    p_cna = min(np.random.geometric(self.cna_copy_param), 2, int(self.max_cna_value - m_cna))
-                                else:
-                                    p_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value - m_cna))
+                            clone_m_cna = clone.maternal_cnas[start_idx]
+                            clone_p_cna = clone.paternal_cnas[start_idx]
+                            if is_wgd:
+                                # Generate duplication CNAs (must be greater than current)
+                                # Randomly choose to duplicate maternal, paternal, or both
+                                mutation_choice = np.random.choice(['maternal', 'paternal', 'both'])
+                                
+                                if mutation_choice == 'maternal':
+                                    m_cna = min(clone_m_cna + np.random.geometric(self.cna_copy_param), int(self.max_cna_value-clone_p_cna))
+                                    p_cna = clone_p_cna
+                                elif mutation_choice == 'paternal':
+                                    m_cna = clone_m_cna
+                                    p_cna = min(clone_p_cna + np.random.geometric(self.cna_copy_param), int(self.max_cna_value-clone_m_cna))
+                                else:  # both
+                                    m_cna = min(clone_m_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value - clone_p_cna)
+                                    p_cna = min(clone_p_cna + np.random.geometric(self.cna_copy_param), self.max_cna_value - m_cna)
+                            else:
+                                # Generate maternal CNA: deletion or duplication
+                                if np.random.binomial(1, self.del_prob):  # Deletion
+                                    m_cna = 0
+                                else:  # Duplication
+                                    m_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value))
+                                
+                                # Paternal CNA: deletion or duplication
+                                if np.random.binomial(1, self.del_prob):  # Deletion
+                                    p_cna = 0
+                                else:  # Duplication
+                                    if m_cna == 1:
+                                        p_cna = min(np.random.geometric(self.cna_copy_param), 2, int(self.max_cna_value - m_cna))
+                                    else:
+                                        p_cna = min(np.random.geometric(self.cna_copy_param), int(self.max_cna_value - m_cna))
                             
                             # Apply the CNA to all bins in the span
                             for idx in span_indices:
@@ -1675,67 +1698,82 @@ class HCDSIM:
                             event_start_pos = ref['Start'][event_start_idx]
                             event_end_pos = ref['End'][event_end_idx]
                             
-                            # Get sequences to check if heterozygous
-                            m_sequence = None
-                            p_sequence = None
-                            if maternal_genome is not None and paternal_genome is not None:
-                                m_sequence = maternal_genome[event_chrom][event_start_pos-1:event_end_pos]
-                                p_sequence = paternal_genome[event_chrom][event_start_pos-1:event_end_pos]
-                            
-                            # Check if this is a LOH event
-                            is_loh = False
-                            loh_type = None
-                            
-                            if m_sequence is not None and p_sequence is not None and m_sequence != p_sequence:
-                                # Sequences are different (heterozygous), check for LOH
-                                if (m_cna == 0 and p_cna != 0) or (m_cna != 0 and p_cna == 0):
-                                    is_loh = True
-                                    total_cn = m_cna + p_cna
-                                    
-                                    if total_cn == 1:
-                                        loh_type = 'CNL_LOH'
-                                    elif total_cn == 2:
-                                        loh_type = 'CNN_LOH'
-                                    else:
-                                        loh_type = 'CNG_LOH'
-                            
-                            # Record the changes based on LOH status
-                            if is_loh:
-                                # Record as LOH event
-                                if m_cna != 1:
+                            if is_wgd:
+                                if m_cna != clone_m_cna:
                                     cell_changes.append([
-                                        clone.name, cell_id, 'maternal', loh_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        str(event_end_pos-event_start_pos + 1),
-                                        f'1->{m_cna}'
+                                        clone.name, cell_id, 'maternal', 'POST_WGD_DUP',
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                                        f'{clone_m_cna}->{m_cna}'
                                     ])
                                 
-                                if p_cna != 1:
+                                if p_cna != clone_p_cna:
                                     cell_changes.append([
-                                        clone.name, cell_id, 'paternal', loh_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        str(event_end_pos-event_start_pos + 1),
-                                        f'1->{p_cna}'
+                                        clone.name, cell_id,'paternal', 'POST_WGD_DUP',
+                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                                        f'{clone_p_cna}->{p_cna}'
                                     ])
                             else:
-                                # Record as regular DEL/DUP events
-                                if m_cna != 1:
-                                    m_event_type = 'DEL' if m_cna == 0 else 'DUP'
-                                    cell_changes.append([
-                                        clone.name, cell_id, 'maternal', m_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        str(event_end_pos-event_start_pos + 1),
-                                        f'1->{m_cna}'
-                                    ])
+                                # Get sequences to check if heterozygous
+                                m_sequence = None
+                                p_sequence = None
+                                if maternal_genome is not None and paternal_genome is not None:
+                                    m_sequence = maternal_genome[event_chrom][event_start_pos-1:event_end_pos]
+                                    p_sequence = paternal_genome[event_chrom][event_start_pos-1:event_end_pos]
                                 
-                                if p_cna != 1:
-                                    p_event_type = 'DEL' if p_cna == 0 else 'DUP'
-                                    cell_changes.append([
-                                        clone.name, cell_id, 'paternal', p_event_type,
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",
-                                        str(event_end_pos-event_start_pos + 1),
-                                        f'1->{p_cna}'
-                                    ])
+                                # Check if this is a LOH event
+                                is_loh = False
+                                loh_type = None
+                                
+                                if m_sequence is not None and p_sequence is not None and m_sequence != p_sequence:
+                                    # Sequences are different (heterozygous), check for LOH
+                                    if (m_cna == 0 and p_cna != 0) or (m_cna != 0 and p_cna == 0):
+                                        is_loh = True
+                                        total_cn = m_cna + p_cna
+                                        
+                                        if total_cn == 1:
+                                            loh_type = 'CNL_LOH'
+                                        elif total_cn == 2:
+                                            loh_type = 'CNN_LOH'
+                                        else:
+                                            loh_type = 'CNG_LOH'
+                                
+                                # Record the changes based on LOH status
+                                if is_loh:
+                                    # Record as LOH event
+                                    if m_cna != 1:
+                                        cell_changes.append([
+                                            clone.name, cell_id, 'maternal', loh_type,
+                                            f"{event_chrom}:{event_start_pos}-{event_end_pos}",
+                                            str(event_end_pos-event_start_pos + 1),
+                                            f'1->{m_cna}'
+                                        ])
+                                    
+                                    if p_cna != 1:
+                                        cell_changes.append([
+                                            clone.name, cell_id, 'paternal', loh_type,
+                                            f"{event_chrom}:{event_start_pos}-{event_end_pos}",
+                                            str(event_end_pos-event_start_pos + 1),
+                                            f'1->{p_cna}'
+                                        ])
+                                else:
+                                    # Record as regular DEL/DUP events
+                                    if m_cna != 1:
+                                        m_event_type = 'DEL' if m_cna == 0 else 'DUP'
+                                        cell_changes.append([
+                                            clone.name, cell_id, 'maternal', m_event_type,
+                                            f"{event_chrom}:{event_start_pos}-{event_end_pos}",
+                                            str(event_end_pos-event_start_pos + 1),
+                                            f'1->{m_cna}'
+                                        ])
+                                    
+                                    if p_cna != 1:
+                                        p_event_type = 'DEL' if p_cna == 0 else 'DUP'
+                                        cell_changes.append([
+                                            clone.name, cell_id, 'paternal', p_event_type,
+                                            f"{event_chrom}:{event_start_pos}-{event_end_pos}",
+                                            str(event_end_pos-event_start_pos + 1),
+                                            f'1->{p_cna}'
+                                        ])
                             
                             cna_event_id += 1
                     
