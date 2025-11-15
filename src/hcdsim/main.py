@@ -2888,7 +2888,7 @@ class HCDSIM:
         dcell = os.path.join(self.outdir, 'cell_bams')
         dtmp = os.path.join(self.outdir, 'tmp')
 
-        downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {clone}_{cell}({mode})")
+        downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {cell} ({mode})")
 
         self.log(f"Downsampling cell bam for {cell} ({mode})", level='PROGRESS')
 
@@ -2990,7 +2990,7 @@ class HCDSIM:
                 os.remove(temp_bam_file)
         
         self.log(f"Finished downsampling cell bam for {cell} ({mode})", level='PROGRESS')
-        downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {clone}_{cell}({mode})")
+        downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {cell} ({mode})")
 
     @utils.log_runtime
     def downsam(self):
