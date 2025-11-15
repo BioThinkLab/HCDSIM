@@ -2964,6 +2964,7 @@ class HCDSIM:
         
         for task in tasks:
             command, log_file = task
+            self.log(command, level='DEBUG')
             utils.runcmd(command, log_file)
         
         # Merge all temp bam files
