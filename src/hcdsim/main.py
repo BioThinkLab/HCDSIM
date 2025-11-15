@@ -2993,9 +2993,7 @@ class HCDSIM:
         # Assign cells for each clone and generate job list
         barcodes = []
         jobs = []
-        
-        self.log('Preparing downsample jobs...', level='PROGRESS')
-        
+                
         for mode in ['maternal', 'paternal']:
             clone_cnv_df = pd.read_csv(os.path.join(dprofile, f'clone_{mode}_cna_matrix.csv'), index_col=0)
             cell_cnv_df = pd.read_csv(os.path.join(dprofile, f'cell_{mode}_cna_matrix.csv'), index_col=0)
@@ -3009,14 +3007,7 @@ class HCDSIM:
                     cell_cnv = cell_cnv_df[cell_name].tolist()
                     jobs.append((clone.name, cell_name, mode, clone_bam_file, clone_cnv, cell_cnv, bins, i))
                     barcodes.append(cell_name)
-        
-        total_bins = len(jobs[0][6]) if jobs else 0
-        self.log(f'Total jobs: {len(jobs)}, bins per job: {total_bins}', level='PROGRESS')
-
-        # Process all cells in parallel
-        self.log('Downsampling cell bam files (optimized with CNV ratio grouping + segment merging)...', 
-                level='PROGRESS')
-        
+                
         lock = Lock()
         counter = Value('i', 0)
         init_args = (lock, counter, len(jobs))
