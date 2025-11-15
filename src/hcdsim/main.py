@@ -2890,89 +2890,103 @@ class HCDSIM:
 
         downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {cell} ({mode})")
 
-        # Group bins by CNV ratio and merge consecutive bins
-        groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
-        temp_bam_files = []
-        tasks = []
-        
-        for group_idx, (group_key, group_data) in enumerate(groups.items()):
-            segments = group_data['segments']
-            clone_cnv_value = group_data['clone_cnv']
-            cell_cnv_value = group_data['cell_cnv']
+        if clone_cnv == cell_cnv:
+            # Simple downsampling for the whole bam
+            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+            ratio = self.cell_coverage / self.clone_coverage
+            random_seed = cell_index + ratio
+            command = "{0} view -b -@ {1} -s {2} {3} -o {4}".format(
+                self.samtools, 
+                self.thread,
+                random_seed, 
+                clone_bam_file, 
+                cell_bam_file
+            )
+            utils.runcmd(command, samtools_log)
+        else:
+            # Group bins by CNV ratio and merge consecutive bins
+            groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
+            temp_bam_files = []
+            tasks = []
             
-            # Calculate ratio
-            if group_key == 'same':
-                # For regions where clone_cnv == cell_cnv
-                ratio = self.cell_coverage / self.clone_coverage
-            else:
-                # For regions where clone_cnv != cell_cnv
-                ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
-            
-            if ratio <= 1:
-                # Simple downsampling for all segments in this group
-                temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}.bam")
-                random_seed = cell_index + ratio
+            for group_idx, (group_key, group_data) in enumerate(groups.items()):
+                segments = group_data['segments']
+                clone_cnv_value = group_data['clone_cnv']
+                cell_cnv_value = group_data['cell_cnv']
                 
-                # Build samtools command with multiple segments
-                segments_str = ' '.join(segments)
-                command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
-                    self.samtools, 
-                    self.thread,
-                    random_seed, 
-                    clone_bam_file, 
-                    segments_str,
-                    temp_bam_file
-                )
-                tasks.append((command, samtools_log))
-                temp_bam_files.append(temp_bam_file)
+                # Calculate ratio
+                if group_key == 'same':
+                    # For regions where clone_cnv == cell_cnv
+                    ratio = self.cell_coverage / self.clone_coverage
+                else:
+                    # For regions where clone_cnv != cell_cnv
+                    ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
                 
-            else:
-                # ratio > 1: need multiple sampling
-                full_copies = int(ratio)
-                fractional_part = ratio - full_copies
-                
-                segments_str = ' '.join(segments)
-                
-                # Full copies
-                for i in range(full_copies):
-                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_copy{i}.bam")
-                    command = "{0} view -b -@ {1} {2} {3} -o {4}".format(
-                        self.samtools,
-                        self.thread,
-                        clone_bam_file, 
-                        segments_str,
-                        temp_bam
-                    )
-                    tasks.append((command, samtools_log))
-                    temp_bam_files.append(temp_bam)
-                
-                # Fractional part
-                if fractional_part > 0:
-                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_frac.bam")
-                    random_seed = cell_index + fractional_part + full_copies
+                if ratio <= 1:
+                    # Simple downsampling for all segments in this group
+                    temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}.bam")
+                    random_seed = cell_index + ratio
+                    
+                    # Build samtools command with multiple segments
+                    segments_str = ' '.join(segments)
                     command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
-                        self.samtools,
+                        self.samtools, 
                         self.thread,
-                        random_seed,
+                        random_seed, 
                         clone_bam_file, 
                         segments_str,
-                        temp_bam
+                        temp_bam_file
                     )
                     tasks.append((command, samtools_log))
-                    temp_bam_files.append(temp_bam)
-        
-        for task in tasks:
-            command, log_file = task
-            utils.runcmd(command, log_file)
-        
-        # Merge all temp bam files
-        cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
+                    temp_bam_files.append(temp_bam_file)
+                    
+                else:
+                    # ratio > 1: need multiple sampling
+                    full_copies = int(ratio)
+                    fractional_part = ratio - full_copies
+                    
+                    segments_str = ' '.join(segments)
+                    
+                    # Full copies
+                    for i in range(full_copies):
+                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_copy{i}.bam")
+                        command = "{0} view -b -@ {1} {2} {3} -o {4}".format(
+                            self.samtools,
+                            self.thread,
+                            clone_bam_file, 
+                            segments_str,
+                            temp_bam
+                        )
+                        tasks.append((command, samtools_log))
+                        temp_bam_files.append(temp_bam)
+                    
+                    # Fractional part
+                    if fractional_part > 0:
+                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_frac.bam")
+                        random_seed = cell_index + fractional_part + full_copies
+                        command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
+                            self.samtools,
+                            self.thread,
+                            random_seed,
+                            clone_bam_file, 
+                            segments_str,
+                            temp_bam
+                        )
+                        tasks.append((command, samtools_log))
+                        temp_bam_files.append(temp_bam)
+            
+            for task in tasks:
+                command, log_file = task
+                utils.runcmd(command, log_file)
+            
+            # Merge all temp bam files
+            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+            self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
 
-        # Clean up temporary files
-        for temp_bam_file in temp_bam_files:
-            if os.path.exists(temp_bam_file):
-                os.remove(temp_bam_file)
+            # Clean up temporary files
+            for temp_bam_file in temp_bam_files:
+                if os.path.exists(temp_bam_file):
+                    os.remove(temp_bam_file)
 
         downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {cell} ({mode})")
 
