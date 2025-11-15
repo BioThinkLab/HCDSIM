@@ -2890,15 +2890,9 @@ class HCDSIM:
 
         downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {cell} ({mode})")
 
-        self.log(f"Downsampling cell bam for {cell} ({mode})", level='PROGRESS')
-
         # Group bins by CNV ratio and merge consecutive bins
         groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
-        
-        total_segments = sum(len(g['segments']) for g in groups.values())
-        self.log(f"  {cell} ({mode}): {len(bins)} bins -> {len(groups)} ratio groups -> {total_segments} segments", 
-                level='PROGRESS')
-        
+                
         temp_bam_files = []
         tasks = []
         
@@ -2911,13 +2905,9 @@ class HCDSIM:
             if group_key == 'same':
                 # For regions where clone_cnv == cell_cnv
                 ratio = self.cell_coverage / self.clone_coverage
-                self.log(f"  {cell} ({mode}): Group 'same' with {len(segments)} segments, ratio={ratio:.4f}", 
-                        level='PROGRESS')
             else:
                 # For regions where clone_cnv != cell_cnv
                 ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
-                self.log(f"  {cell} ({mode}): Group '{group_key}' with {len(segments)} segments, ratio={ratio:.4f}", 
-                        level='PROGRESS')
             
             if ratio <= 1:
                 # Simple downsampling for all segments in this group
@@ -2972,24 +2962,19 @@ class HCDSIM:
                     tasks.append((command, samtools_log))
                     temp_bam_files.append(temp_bam)
         
-        # Execute samtools commands in parallel
-        self.log(f"  {cell} ({mode}): Processing {len(tasks)} samtools tasks", level='PROGRESS')
-        
         for task in tasks:
             command, log_file = task
             utils.runcmd(command, log_file)
         
         # Merge all temp bam files
         cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        self.log(f"  {cell} ({mode}): Merging {len(temp_bam_files)} temporary BAM files", level='PROGRESS')
         self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
 
         # Clean up temporary files
         for temp_bam_file in temp_bam_files:
             if os.path.exists(temp_bam_file):
                 os.remove(temp_bam_file)
-        
-        self.log(f"Finished downsampling cell bam for {cell} ({mode})", level='PROGRESS')
+
         downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {cell} ({mode})")
 
     @utils.log_runtime
