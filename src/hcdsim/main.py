@@ -2892,7 +2892,7 @@ class HCDSIM:
 
         # Group bins by CNV ratio and merge consecutive bins
         groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
-                
+        self.log(groups, level='DEBUG')
         temp_bam_files = []
         tasks = []
         
