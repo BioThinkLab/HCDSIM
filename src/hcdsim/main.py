@@ -2259,99 +2259,99 @@ class HCDSIM:
     #     utils.runcmd(command, samtools_log)
     #     downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
 
-    def _merge_bams_in_batches(self, output_file, input_files, batch_size=1000):
-        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-        dtmp = os.path.join(self.outdir, 'tmp')
-        temp_merged = []
+    # def _merge_bams_in_batches(self, output_file, input_files, batch_size=1000):
+    #     samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+    #     dtmp = os.path.join(self.outdir, 'tmp')
+    #     temp_merged = []
         
-        for i in range(0, len(input_files), batch_size):
-            batch = input_files[i:i+batch_size]
-            temp_output = os.path.join(dtmp, f"temp_merged_{i}.bam")
-            temp_bam_list_file = os.path.join(dtmp, f"temp_{i}_bam_list.txt")
+    #     for i in range(0, len(input_files), batch_size):
+    #         batch = input_files[i:i+batch_size]
+    #         temp_output = os.path.join(dtmp, f"temp_merged_{i}.bam")
+    #         temp_bam_list_file = os.path.join(dtmp, f"temp_{i}_bam_list.txt")
 
-            with open(temp_bam_list_file, 'w') as f:
-                for temp_bam_file in batch:
-                    f.write(temp_bam_file + '\n')
-            merge_cmd = "{0} merge -@ {1} -f -b {2} {3}".format(
-                self.samtools, self.thread, temp_bam_list_file, temp_output
-            )
-            utils.runcmd(merge_cmd, samtools_log)
-            temp_merged.append(temp_output)
-            if os.path.exists(temp_bam_list_file):
-                os.remove(temp_bam_list_file)
+    #         with open(temp_bam_list_file, 'w') as f:
+    #             for temp_bam_file in batch:
+    #                 f.write(temp_bam_file + '\n')
+    #         merge_cmd = "{0} merge -@ {1} -f -b {2} {3}".format(
+    #             self.samtools, self.thread, temp_bam_list_file, temp_output
+    #         )
+    #         utils.runcmd(merge_cmd, samtools_log)
+    #         temp_merged.append(temp_output)
+    #         if os.path.exists(temp_bam_list_file):
+    #             os.remove(temp_bam_list_file)
         
-        if len(temp_merged) == 1:
-            os.rename(temp_merged[0], output_file)
-        else:
-            final_merge_cmd = "{0} merge -@ {1} -f {2} {3}".format(
-                self.samtools, self.thread, output_file, ' '.join(temp_merged)
-            )
-            utils.runcmd(final_merge_cmd, samtools_log)
+    #     if len(temp_merged) == 1:
+    #         os.rename(temp_merged[0], output_file)
+    #     else:
+    #         final_merge_cmd = "{0} merge -@ {1} -f {2} {3}".format(
+    #             self.samtools, self.thread, output_file, ' '.join(temp_merged)
+    #         )
+    #         utils.runcmd(final_merge_cmd, samtools_log)
             
-            for f in temp_merged:
-                os.remove(f)
+    #         for f in temp_merged:
+    #             os.remove(f)
 
-    def _downsampling_cell_bam(self, job):
-        (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
+    # def _downsampling_cell_bam(self, job):
+    #     (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
 
-        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-        dcell = os.path.join(self.outdir, 'cell_bams')
-        dtmp = os.path.join(self.outdir, 'tmp')
+    #     samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+    #     dcell = os.path.join(self.outdir, 'cell_bams')
+    #     dtmp = os.path.join(self.outdir, 'tmp')
 
-        self.log(f"Downsampling cell bam for {cell}", level='PROGRESS')
+    #     self.log(f"Downsampling cell bam for {cell}", level='PROGRESS')
 
-        clone_cnv_vector = np.array(clone_cnv)
-        cell_cnv_vector = np.array(cell_cnv)
-        temp_bam_files = []
-        tasks = []
-        for index, bin in enumerate(bins):
-            clone_cnv_value = clone_cnv_vector[index]
-            cell_cnv_value = cell_cnv_vector[index]
-            if clone_cnv_value == 0 or cell_cnv_value == 0:
-                continue
-            ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
+    #     clone_cnv_vector = np.array(clone_cnv)
+    #     cell_cnv_vector = np.array(cell_cnv)
+    #     temp_bam_files = []
+    #     tasks = []
+    #     for index, bin in enumerate(bins):
+    #         clone_cnv_value = clone_cnv_vector[index]
+    #         cell_cnv_value = cell_cnv_vector[index]
+    #         if clone_cnv_value == 0 or cell_cnv_value == 0:
+    #             continue
+    #         ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
 
-            chrom, pos = bin.split(':')
-            start, end = pos.split('-')
+    #         chrom, pos = bin.split(':')
+    #         start, end = pos.split('-')
 
-            if ratio <=1:
-                temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
-                command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
-                tasks.append((command, samtools_log))
-                temp_bam_files.append(temp_bam_file)
-            else:
-                full_copies = int(ratio)  
-                fractional_part = ratio - full_copies
+    #         if ratio <=1:
+    #             temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
+    #             command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
+    #             tasks.append((command, samtools_log))
+    #             temp_bam_files.append(temp_bam_file)
+    #         else:
+    #             full_copies = int(ratio)  
+    #             fractional_part = ratio - full_copies
                 
-                for i in range(full_copies):
-                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_copy{i}.bam")
-                    command = "{0} view -b {1} {2} > {3}".format(
-                        self.samtools, clone_bam_file, bin, temp_bam)
-                    utils.runcmd(command, samtools_log)
-                    temp_bam_files.append(temp_bam)
+    #             for i in range(full_copies):
+    #                 temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_copy{i}.bam")
+    #                 command = "{0} view -b {1} {2} > {3}".format(
+    #                     self.samtools, clone_bam_file, bin, temp_bam)
+    #                 utils.runcmd(command, samtools_log)
+    #                 temp_bam_files.append(temp_bam)
                 
-                if fractional_part > 0:
-                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_frac.bam")
-                    random_seed = cell_index + fractional_part + full_copies
-                    command = "{0} view -b -s {1} {2} {3} > {4}".format(
-                        self.samtools, random_seed, clone_bam_file, bin, temp_bam)
-                    utils.runcmd(command, samtools_log)
-                    temp_bam_files.append(temp_bam)                
+    #             if fractional_part > 0:
+    #                 temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_frac.bam")
+    #                 random_seed = cell_index + fractional_part + full_copies
+    #                 command = "{0} view -b -s {1} {2} {3} > {4}".format(
+    #                     self.samtools, random_seed, clone_bam_file, bin, temp_bam)
+    #                 utils.runcmd(command, samtools_log)
+    #                 temp_bam_files.append(temp_bam)                
         
-        with Pool(processes=self.thread) as pool:
-            pool.starmap(utils.runcmd, tasks)
+    #     with Pool(processes=self.thread) as pool:
+    #         pool.starmap(utils.runcmd, tasks)
     
-        # merge all temp bam files
-        # write all temp bam files to a text file
-        cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-        self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
+    #     # merge all temp bam files
+    #     # write all temp bam files to a text file
+    #     cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+    #     self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
 
-        # clean temp bam files
-        for temp_bam_file in temp_bam_files:
-            if os.path.exists(temp_bam_file):
-                os.remove(temp_bam_file)
+    #     # clean temp bam files
+    #     for temp_bam_file in temp_bam_files:
+    #         if os.path.exists(temp_bam_file):
+    #             os.remove(temp_bam_file)
         
-        self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
+    #     self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
         
     def _process_cell_bam(self, job):
         (cell, dcell, dtmp, dlog) = job
@@ -2682,27 +2682,340 @@ class HCDSIM:
         random_tree.save_tree_to_file(root, tree_json)
         self.log('align BYEBYE')
     
+    # @utils.log_runtime
+    # def downsam(self):
+    #     self.log('Setting directories', level='PROGRESS')
+    #     dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
+
+    #     tree_json = os.path.join(dprofile, 'tree.json')
+    
+    #     utils.check_exist(tree_json=tree_json)
+        
+    #     # load object from file
+    #     root = random_tree.load_tree_from_file(tree_json)
+    #     all_clones = random_tree.collect_all_nodes(root)
+
+    #     # assign cells for each clone and generating job list
+    #     barcodes = []
+    #     jobs = []
+    #     for mode in ['maternal', 'paternal']:
+    #         clone_cnv_df = pd.read_csv(os.path.join(dprofile, f'clone_{mode}_cna_matrix.csv'), index_col=0)
+    #         cell_cnv_df = pd.read_csv(os.path.join(dprofile, f'cell_{mode}_cna_matrix.csv'), index_col=0)
+    #         for clone in all_clones:
+    #             # downsample maternal and paternal bam file for each cell
+    #             clone_bam_file = os.path.join(dclone, f'{clone.name}_{mode}.bam')
+    #             clone_cnv = clone_cnv_df[f'{clone.name}_{mode}_cnas'].tolist()
+    #             bins = clone_cnv_df.index.tolist()
+    #             for i in range(clone.cell_no):
+    #                 cell_name = clone.name + '_cell' + str(i+1)
+    #                 cell_cnv = cell_cnv_df[cell_name].tolist()
+    #                 jobs.append((clone.name, cell_name, mode, clone_bam_file, clone_cnv, cell_cnv, bins, i))
+    #                 barcodes.append(cell_name)
+
+    #     # set parallel jobs for each cell
+    #     # lock = Lock()
+    #     # counter = Value('i', 0)
+    #     # init_args = (lock, counter, len(jobs))
+    #     # pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
+        
+    #     # self.log('Downsampling cell bam...', level='PROGRESS')
+    #     # for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
+    #     #     pass
+    #     # pool.close()
+    #     # pool.join()
+    #     for job in jobs:
+    #         self._downsampling_cell_bam(job)
+        
+    #     # merge cell maternal and paternal bam file
+    #     self.log('Merging maternal and paternal cell bam files...', level='PROGRESS')
+    #     for cell in barcodes:
+    #         maternal_bam = os.path.join(dcell, f'{cell}_maternal.bam')
+    #         paternal_bam = os.path.join(dcell, f'{cell}_paternal.bam')
+    #         merged_bam = os.path.join(dcell, f'{cell}.bam')
+    #         samtools_log = os.path.join(dlog, 'samtools_log.txt')
+    #         command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, merged_bam, maternal_bam, paternal_bam)
+    #         utils.runcmd(command, samtools_log)
+    #         # index merged bam file
+    #         command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, merged_bam)
+    #         utils.runcmd(command, samtools_log)
+    #         # remove maternal and paternal bam files
+    #         # if os.path.exists(maternal_bam):
+    #         #     os.remove(maternal_bam)
+    #         # if os.path.exists(maternal_bam + '.bai'):
+    #         #     os.remove(maternal_bam + '.bai')
+    #         # if os.path.exists(paternal_bam):
+    #         #     os.remove(paternal_bam)
+    #         # if os.path.exists(paternal_bam + '.bai'):
+    #         #     os.remove(paternal_bam + '.bai')
+        
+    #     self.log('Writing cell list to barcode.txt...', level='PROGRESS')
+    #     barcodes_file = os.path.join(dprofile, 'barcodes.txt')
+    #     with open(barcodes_file, 'w') as output:
+    #         for barcode in barcodes:
+    #             output.write(barcode+'\n')
+
+    #     self.log('Storing the tree to json file...', level='PROGRESS')
+    #     random_tree.save_tree_to_file(root, tree_json)
+    #     self.log('downsam BYEBYE')
+
+    def _merge_consecutive_bins(self, bins):
+        """
+        Merge consecutive bins into segments
+        
+        Parameters:
+        -----------
+        bins : list
+            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
+        
+        Returns:
+        --------
+        list : List of merged region strings ['chr1:1-200000', ...]
+        """
+        if len(bins) == 0:
+            return []
+        
+        segments = []
+        current_segment = None
+        
+        for bin_range in bins:
+            # Parse bin
+            chrom, pos = bin_range.split(':')
+            start, end = pos.split('-')
+            start = int(start)
+            end = int(end)
+            
+            if current_segment is None:
+                # Start new segment
+                current_segment = {
+                    'chrom': chrom,
+                    'start': start,
+                    'end': end
+                }
+            elif (current_segment['chrom'] == chrom and 
+                current_segment['end'] + 1 == start):  # Check if consecutive
+                # Merge into current segment
+                current_segment['end'] = end
+            else:
+                # Save current segment and start new one
+                region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
+                segments.append(region_str)
+                
+                current_segment = {
+                    'chrom': chrom,
+                    'start': start,
+                    'end': end
+                }
+        
+        # Add the last segment
+        if current_segment is not None:
+            region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
+            segments.append(region_str)
+        
+        return segments
+
+
+    def _group_segments_by_cnv_ratio(self, bins, clone_cnv, cell_cnv):
+        """
+        Group bins into segments based on CNV ratio
+        
+        Strategy:
+        1. Group bins by CNV ratio (clone_cnv == cell_cnv as one group, others by ratio)
+        2. Within each group, merge consecutive bins into segments
+        
+        Parameters:
+        -----------
+        bins : list
+            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
+        clone_cnv : list or np.array
+            CNV values of clone
+        cell_cnv : list or np.array
+            CNV values of cell
+        
+        Returns:
+        --------
+        dict : Grouped segments by ratio
+            Key: ratio value (or 'same' for clone_cnv == cell_cnv)
+            Value: dict with 'segments', 'clone_cnv', 'cell_cnv'
+        """
+        if len(bins) == 0:
+            return {}
+        
+        # First, group bins by their CNV characteristics (preserve order)
+        temp_groups = {}
+        
+        for i, bin_range in enumerate(bins):
+            clone_cnv_val = clone_cnv[i]
+            cell_cnv_val = cell_cnv[i]
+            
+            # Skip zero values
+            if clone_cnv_val == 0 or cell_cnv_val == 0:
+                continue
+            
+            # Determine the group key
+            if clone_cnv_val == cell_cnv_val:
+                group_key = 'same'
+            else:
+                ratio = cell_cnv_val / clone_cnv_val
+                group_key = f'ratio_{ratio:.6f}'
+            
+            if group_key not in temp_groups:
+                temp_groups[group_key] = {
+                    'bins': [],
+                    'clone_cnv': clone_cnv_val,
+                    'cell_cnv': cell_cnv_val
+                }
+            
+            temp_groups[group_key]['bins'].append(bin_range)
+        
+        # Second, merge consecutive bins within each group into segments
+        groups = {}
+        for group_key, group_data in temp_groups.items():
+            segments = self._merge_consecutive_bins(group_data['bins'])
+            groups[group_key] = {
+                'segments': segments,
+                'clone_cnv': group_data['clone_cnv'],
+                'cell_cnv': group_data['cell_cnv']
+            }
+        
+        return groups
+
+
+    def _downsampling_cell_bam(self, job):
+        """Optimized version: grouping by CNV ratio + merging consecutive bins"""
+        (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
+
+        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+        dcell = os.path.join(self.outdir, 'cell_bams')
+        dtmp = os.path.join(self.outdir, 'tmp')
+
+        downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {clone}_{cell}({mode})")
+
+        self.log(f"Downsampling cell bam for {cell} ({mode})", level='PROGRESS')
+
+        # Group bins by CNV ratio and merge consecutive bins
+        groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
+        
+        total_segments = sum(len(g['segments']) for g in groups.values())
+        self.log(f"  {cell} ({mode}): {len(bins)} bins -> {len(groups)} ratio groups -> {total_segments} segments", 
+                level='PROGRESS')
+        
+        temp_bam_files = []
+        tasks = []
+        
+        for group_idx, (group_key, group_data) in enumerate(groups.items()):
+            segments = group_data['segments']
+            clone_cnv_value = group_data['clone_cnv']
+            cell_cnv_value = group_data['cell_cnv']
+            
+            # Calculate ratio
+            if group_key == 'same':
+                # For regions where clone_cnv == cell_cnv
+                ratio = self.cell_coverage / self.clone_coverage
+                self.log(f"  {cell} ({mode}): Group 'same' with {len(segments)} segments, ratio={ratio:.4f}", 
+                        level='PROGRESS')
+            else:
+                # For regions where clone_cnv != cell_cnv
+                ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
+                self.log(f"  {cell} ({mode}): Group '{group_key}' with {len(segments)} segments, ratio={ratio:.4f}", 
+                        level='PROGRESS')
+            
+            if ratio <= 1:
+                # Simple downsampling for all segments in this group
+                temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}.bam")
+                random_seed = cell_index + ratio
+                
+                # Build samtools command with multiple segments
+                segments_str = ' '.join(segments)
+                command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
+                    self.samtools, 
+                    self.thread,
+                    random_seed, 
+                    clone_bam_file, 
+                    segments_str,
+                    temp_bam_file
+                )
+                tasks.append((command, samtools_log))
+                temp_bam_files.append(temp_bam_file)
+                
+            else:
+                # ratio > 1: need multiple sampling
+                full_copies = int(ratio)
+                fractional_part = ratio - full_copies
+                
+                segments_str = ' '.join(segments)
+                
+                # Full copies
+                for i in range(full_copies):
+                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_copy{i}.bam")
+                    command = "{0} view -b -@ {1} {2} {3} -o {4}".format(
+                        self.samtools,
+                        self.thread,
+                        clone_bam_file, 
+                        segments_str,
+                        temp_bam
+                    )
+                    tasks.append((command, samtools_log))
+                    temp_bam_files.append(temp_bam)
+                
+                # Fractional part
+                if fractional_part > 0:
+                    temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_frac.bam")
+                    random_seed = cell_index + fractional_part + full_copies
+                    command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
+                        self.samtools,
+                        self.thread,
+                        random_seed,
+                        clone_bam_file, 
+                        segments_str,
+                        temp_bam
+                    )
+                    tasks.append((command, samtools_log))
+                    temp_bam_files.append(temp_bam)
+        
+        # Execute samtools commands in parallel
+        self.log(f"  {cell} ({mode}): Processing {len(tasks)} samtools tasks", level='PROGRESS')
+        
+        for task in tasks:
+            command, log_file = task
+            utils.runcmd(command, log_file)
+        
+        # Merge all temp bam files
+        cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+        self.log(f"  {cell} ({mode}): Merging {len(temp_bam_files)} temporary BAM files", level='PROGRESS')
+        self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
+
+        # Clean up temporary files
+        for temp_bam_file in temp_bam_files:
+            if os.path.exists(temp_bam_file):
+                os.remove(temp_bam_file)
+        
+        self.log(f"Finished downsampling cell bam for {cell} ({mode})", level='PROGRESS')
+        downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {clone}_{cell}({mode})")
+
     @utils.log_runtime
     def downsam(self):
         self.log('Setting directories', level='PROGRESS')
         dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
 
         tree_json = os.path.join(dprofile, 'tree.json')
-    
+
         utils.check_exist(tree_json=tree_json)
         
-        # load object from file
+        # Load object from file
         root = random_tree.load_tree_from_file(tree_json)
         all_clones = random_tree.collect_all_nodes(root)
 
-        # assign cells for each clone and generating job list
+        # Assign cells for each clone and generate job list
         barcodes = []
         jobs = []
+        
+        self.log('Preparing downsample jobs...', level='PROGRESS')
+        
         for mode in ['maternal', 'paternal']:
             clone_cnv_df = pd.read_csv(os.path.join(dprofile, f'clone_{mode}_cna_matrix.csv'), index_col=0)
             cell_cnv_df = pd.read_csv(os.path.join(dprofile, f'cell_{mode}_cna_matrix.csv'), index_col=0)
             for clone in all_clones:
-                # downsample maternal and paternal bam file for each cell
+                # Downsample maternal and paternal bam file for each cell
                 clone_bam_file = os.path.join(dclone, f'{clone.name}_{mode}.bam')
                 clone_cnv = clone_cnv_df[f'{clone.name}_{mode}_cnas'].tolist()
                 bins = clone_cnv_df.index.tolist()
@@ -2711,52 +3024,52 @@ class HCDSIM:
                     cell_cnv = cell_cnv_df[cell_name].tolist()
                     jobs.append((clone.name, cell_name, mode, clone_bam_file, clone_cnv, cell_cnv, bins, i))
                     barcodes.append(cell_name)
+        
+        total_bins = len(jobs[0][6]) if jobs else 0
+        self.log(f'Total jobs: {len(jobs)}, bins per job: {total_bins}', level='PROGRESS')
 
-        # set parallel jobs for each cell
-        # lock = Lock()
-        # counter = Value('i', 0)
-        # init_args = (lock, counter, len(jobs))
-        # pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
+        # Process all cells in parallel
+        self.log('Downsampling cell bam files (optimized with CNV ratio grouping + segment merging)...', 
+                level='PROGRESS')
         
-        # self.log('Downsampling cell bam...', level='PROGRESS')
-        # for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
-        #     pass
-        # pool.close()
-        # pool.join()
-        for job in jobs:
-            self._downsampling_cell_bam(job)
+        lock = Lock()
+        counter = Value('i', 0)
+        init_args = (lock, counter, len(jobs))
+        pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
         
-        # merge cell maternal and paternal bam file
+        self.log('Processing cell bam...', level='PROGRESS')
+        for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
+            pass
+        pool.close()
+        pool.join()
+        
+        # Merge cell maternal and paternal bam files
         self.log('Merging maternal and paternal cell bam files...', level='PROGRESS')
-        for cell in barcodes:
+        unique_barcodes = sorted(set(barcodes))
+        
+        for cell in unique_barcodes:
             maternal_bam = os.path.join(dcell, f'{cell}_maternal.bam')
             paternal_bam = os.path.join(dcell, f'{cell}_paternal.bam')
             merged_bam = os.path.join(dcell, f'{cell}.bam')
             samtools_log = os.path.join(dlog, 'samtools_log.txt')
-            command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, merged_bam, maternal_bam, paternal_bam)
+            
+            command = "{0} merge -@ {1} -f {2} {3} {4}".format(
+                self.samtools, self.thread, merged_bam, maternal_bam, paternal_bam)
             utils.runcmd(command, samtools_log)
-            # index merged bam file
+            
+            # Index merged bam file
             command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, merged_bam)
             utils.runcmd(command, samtools_log)
-            # remove maternal and paternal bam files
-            # if os.path.exists(maternal_bam):
-            #     os.remove(maternal_bam)
-            # if os.path.exists(maternal_bam + '.bai'):
-            #     os.remove(maternal_bam + '.bai')
-            # if os.path.exists(paternal_bam):
-            #     os.remove(paternal_bam)
-            # if os.path.exists(paternal_bam + '.bai'):
-            #     os.remove(paternal_bam + '.bai')
         
         self.log('Writing cell list to barcode.txt...', level='PROGRESS')
         barcodes_file = os.path.join(dprofile, 'barcodes.txt')
         with open(barcodes_file, 'w') as output:
-            for barcode in barcodes:
+            for barcode in sorted(set(barcodes)):
                 output.write(barcode+'\n')
 
         self.log('Storing the tree to json file...', level='PROGRESS')
         random_tree.save_tree_to_file(root, tree_json)
-        self.log('downsam BYEBYE')
+        self.log('downsam COMPLETE!')
 
     @utils.log_runtime
     def pbam(self):
