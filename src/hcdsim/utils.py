@@ -13,7 +13,7 @@ import time
 import functools
 
 from scipy.stats import beta as beta_dist, norm
-from scipy.optimize import fsolve, newton_krylov, minimize, NoConvergence
+from scipy.optimize import fsolve, newton_krylov, minimize
 from pyfaidx import Fasta
 
 # check part
@@ -730,9 +730,6 @@ def lorenz_to_beta(x0, y0):
                     solution = (alpha, beta)
 
                     break
-        except (NoConvergence, ValueError):
-            # Random new guess
-            guess = np.random.rand(2) * 10 + 0.1
         except Exception as e:
             guess = np.random.rand(2) * 10 + 0.1
     
