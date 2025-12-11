@@ -1167,6 +1167,10 @@ class HCDSIM:
                                 # Check if we've crossed chromosome boundary
                                 if ref['Chromosome'][idx] != start_chrom:
                                     break
+
+                                if clone.cna_status[idx] == 'post-wgd-dup':
+                                    can_place = False
+                                    break
                                 
                                 span_indices.append(idx)
                             
