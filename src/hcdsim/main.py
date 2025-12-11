@@ -2391,22 +2391,22 @@ class HCDSIM:
         utils.runcmd(command, samtools_log)
 
         # run samtools remove dupliations
-        pbam_bar.progress(advance=False, msg="Samtools markdup for {}".format(cell))
-        command = '{0} markdup -@ {1} -r {2} {3}'.format(self.samtools, self.thread, sorted_bam_file, dedup_bam_file)
-        utils.runcmd(command, samtools_log)
+        # pbam_bar.progress(advance=False, msg="Samtools markdup for {}".format(cell))
+        # command = '{0} markdup -@ {1} -r {2} {3}'.format(self.samtools, self.thread, sorted_bam_file, dedup_bam_file)
+        # utils.runcmd(command, samtools_log)
 
         pbam_bar.progress(advance=False, msg="Samtools index for {}".format(cell))
-        command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, dedup_bam_file)
+        command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, sorted_bam_file)
         utils.runcmd(command, samtools_log)
 
         # clean tmp bam file
         for tmp_file in tmp_files:
-            if os.path.exists(tmp_file) and os.path.exists(dedup_bam_file):
+            if os.path.exists(tmp_file) and os.path.exists(sorted_bam_file):
                 os.remove(tmp_file)
         
         # rename cell bam
-        os.rename(dedup_bam_file, bam_file)
-        os.rename(dedup_bam_file + '.bai', bam_file + '.bai')
+        os.rename(sorted_bam_file, bam_file)
+        os.rename(sorted_bam_file + '.bai', bam_file + '.bai')
         pbam_bar.progress(advance=True, msg="Finish cell bam processing for {}".format(cell))
 
     def _call_bedtools(self, cell_bam, ref_bed, coverage_file):
