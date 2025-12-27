@@ -9,6 +9,7 @@ from multiprocessing import Pool, Value, Lock
 from scipy.stats import poisson
 import numpy as np
 import pandas as pd
+from typing import List, Optional
 
 from . import beta_splitting_model_tree as random_tree
 from . import utils
@@ -69,6 +70,8 @@ class HCDSIM:
                 cna_prob: float = 0.02,
                 del_prob: float = 0.2,
                 cna_copy_param: float = 0.5,
+                weights: Optional[List[float]] = None,
+                lambdas: Optional[List[int]] = None,
                 clone_coverage: float = 30, 
                 cell_coverage: float = 0.5, 
                 reads_len: int = 150, 
@@ -79,11 +82,10 @@ class HCDSIM:
                 chrom_arm_rate: float = 0.75,
                 loh_cna_no: int = 15, 
                 goh_cna_no: int = 5, 
-                mirror_cna_no: int = 0, 
                 unique_ratio: float = 0.5,
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
-                lorenz_y: float = 0.4,
+                lorenz_y: float = 0.35,
                 window_size: int = 200000,
                 correlation_len: int = 10,
                 max_ploidy: int = None,
@@ -104,6 +106,17 @@ class HCDSIM:
             self.thread = mp.cpu_count()
             params['thread'] = self.thread
         
+        # set default weights and lambdas for mixture poisson
+        if weights is None:
+            self.weights = [0.3, 0.4, 0.2, 0.1]
+        else:
+            self.weights = weights
+
+        if lambdas is None:
+            self.lambdas = [5, 20, 100, 300]
+        else:
+            self.lambdas = lambdas
+
         # validate bin size 
         self._validate_bin_size(bin_size)
 
@@ -284,137 +297,8 @@ class HCDSIM:
         utils.check_lt_zero(loh_cna_no=self.loh_cna_no)
         utils.check_int(goh_cna_no=self.goh_cna_no)
         utils.check_lt_zero(goh_cna_no=self.goh_cna_no)
-        utils.check_int(mirror_cna_no=self.mirror_cna_no)
-        utils.check_lt_zero(mirror_cna_no=self.mirror_cna_no)
         utils.check_int(barcode_len=self.barcode_len)
         utils.check_positive(barcode_len=self.barcode_len)
-
-    def set_params(self, **params):
-        """Set the parameters of HCDSIM.
-
-        Any parameters not given as named arguments will be left at their
-        current value.
-
-        Parameters
-        ----------
-
-        ref_genome: str, required
-            The reference genome file path
-        
-        snp_list: str, required
-            The snp list file
-
-        outdir: str, optional, default: './'
-            The output directory
-        
-        clone_no: int, optional, default: 1
-            The random clone number contained in evolution tree
-        
-        cell_no: int, optional, default: 2
-            The total cell number for this simultion dataset
-        
-        max_tree_depth: int, optional, default: 4
-            The maximum depth of random evolution tree
-        
-        bin_size: int, optional, default: 500000
-            The fixed bin length
-        
-        heho_ratio: float, optional, default: 0.5
-            Ratio of heterozygous SNPs
-
-        wgd_cna_no: int, optional, default: 0
-
-        
-        cna_prob: float, optional, default: 0.8
-            The cutoff probability of a bin undergoing CNV, if random probability is larger than cutoff, CNV happens
-        
-        clone_coverage: float, optional, default: 30
-            The coverage for clone fastq file
-
-        cell_coverage: float, optional, default: 0.5
-            The coverage for each cell in a clone
-        
-        reads_len: int, optional, default: 150
-            The reads length in fastq file
-        
-        insertion_size: int, optional, default: 350
-            The outer distance between the two ends
-        
-        error_rate: float, optional, default: 0.02
-            The base error rate
-
-        Returns
-        -------
-        self
-        """
-
-        # parameters
-        if 'ref_genome' in params and params['ref_genome'] != self.ref_genome:
-            self.ref_genome = params['ref_genome']
-            del params['ref_genome']
-        if 'snp_list' in params and params['snp_list'] != self.snp_list:
-            self.snp_list = params['snp_list']
-            del params['snp_list']
-        if 'ignore' in params and params['ignore'] != self.ignore:
-            self.ignore = params['ignore']
-            del params['ignore']
-        if 'outdir' in params and params['outdir'] != self.outdir:
-            self.outdir = params['outdir']
-            del params['outdir']
-        if 'clone_no' in params and params['clone_no'] != self.clone_no:
-            self.clone_no = params['clone_no']
-            del params['clone_no']
-        if 'cell_no' in params and params['cell_no'] != self.cell_no:
-            self.cell_no = params['cell_no']
-            del params['cell_no']
-        if 'max_tree_depth' in params and params['max_tree_depth'] != self.max_tree_depth:
-            self.max_tree_depth = params['max_tree_depth']
-            del params['max_tree_depth']
-        if 'bin_size' in params and params['bin_size'] != self.bin_size:
-            self.bin_size = params['bin_size']
-            del params['bin_size']
-        if 'thread' in params and params['thread'] != self.thread:
-            self.thread = params['thread']
-            del params['thread']
-        if 'heho_ratio' in params and params['heho_ratio'] != self.heho_ratio:
-            self.heho_ratio = params['heho_ratio']
-            del params['heho_ratio']
-        if 'cna_prob' in params and params['cna_prob'] != self.cna_prob:
-            self.cna_prob = params['cna_prob']
-            del params['cna_prob']
-        if 'clone_coverage' in params and params['clone_coverage'] != self.clone_coverage:
-            self.clone_coverage = params['clone_coverage']
-            del params['clone_coverage']
-        if 'cell_coverage' in params and params['cell_coverage'] != self.cell_coverage:
-            self.cell_coverage = params['cell_coverage']
-            del params['cell_coverage']
-        if 'reads_len' in params and params['reads_len'] != self.reads_len:
-            self.reads_len = params['reads_len']
-            del params['reads_len']
-        if 'insertion_size' in params and params['insertion_size'] != self.insertion_size:
-            self.insertion_size = params['insertion_size']
-            del params['insertion_size']
-        if 'error_rate' in params and params['error_rate'] != self.error_rate:
-            self.error_rate = params['error_rate']
-            del params['error_rate']
-        if 'wgd_cna_no' in params and params['wgd_cna_no'] != self.wgd_cna_no:
-            self.wgd_cna_no = params['wgd_cna_no']
-            del params['wgd_cna_no']
-        if 'wcl_cna_no' in params and params['wcl_cna_no'] != self.wcl_cna_no:
-            self.wcl_cna_no = params['wcl_cna_no']
-            del params['wcl_cna_no']
-        if 'loh_cna_no' in params and params['loh_cna_no'] != self.loh_cna_no:
-            self.loh_cna_no = params['loh_cna_no']
-            del params['loh_cna_no']
-        if 'goh_cna_no' in params and params['goh_cna_no'] != self.goh_cna_no:
-            self.goh_cna_no = params['goh_cna_no']
-            del params['goh_cna_no']
-        if 'mirror_cna_no' in params and params['mirror_cna_no'] != self.mirror_cna_no:
-            self.mirror_cna_no = params['mirror_cna_no']
-            del params['mirror_cna_no']
-        self._check_params()
-        self.get_params()
-        return self
 
     def get_params(self):
         print(vars(self))
@@ -578,7 +462,6 @@ class HCDSIM:
         genome_version = self.genome_version
         bin_size = self.bin_size
         
-        # 着丝粒位置 (hg19) - UCSC官方数据
         centromere_hg19 = {
             'chr1': 125200000, 'chr2': 93650000, 'chr3': 90900000,
             'chr4': 50450000, 'chr5': 48400000, 'chr6': 61000000,
@@ -590,7 +473,6 @@ class HCDSIM:
             'chr22': 15050000, 'chrX': 60550000, 'chrY': 12500000
         }
         
-        # 着丝粒位置 (hg38) - UCSC官方数据
         centromere_hg38 = {
             'chr1': 123400000, 'chr2': 93900000, 'chr3': 90900000,
             'chr4': 50000000, 'chr5': 48750000, 'chr6': 60550000,
@@ -602,7 +484,6 @@ class HCDSIM:
             'chr22': 15550000, 'chrX': 60950000, 'chrY': 10450000
         }
         
-        # 选择对应版本的着丝粒位置
         if genome_version.lower() == 'hg19':
             centromere_positions = centromere_hg19
         elif genome_version.lower() == 'hg38':
@@ -777,7 +658,7 @@ class HCDSIM:
                     if clone.cna_status[start_idx] is not None:
                         continue
                     
-                    num_windows_span = utils.generate_mixture_poisson()
+                    num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                     
                     # Get chromosome of the start position
                     start_chrom = ref['Chromosome'][start_idx]
@@ -819,7 +700,7 @@ class HCDSIM:
                 while i < total_bin_lens:
                     if clone.cna_status[i] is None:
                         if np.random.binomial(1, self.cna_prob):
-                            num_windows_span = utils.generate_mixture_poisson()
+                            num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                             
                             # Get chromosome of the start position
                             start_chrom = ref['Chromosome'][i]
@@ -1148,7 +1029,7 @@ class HCDSIM:
                     # Randomly select positions for new CNAs with probability
                     for i in range(total_bin_lens):
                         if np.random.binomial(1, self.cna_prob * 0.1):  # Reduced probability for post-WGD mutations
-                            num_windows_span = utils.generate_mixture_poisson()
+                            num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                             
                             # Get chromosome of the start position
                             start_chrom = ref['Chromosome'][i]
@@ -1210,14 +1091,14 @@ class HCDSIM:
                                 
                                 if new_m_cna != parent_m_cna:
                                     clone.changes.append([
-                                        parent.name, clone.name, 'maternal', 'POST_WGD_DUP',
+                                        parent.name, clone.name, 'maternal', 'DUP',
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{new_m_cna}'
                                     ])
                                 
                                 if new_p_cna != parent_p_cna:
                                     clone.changes.append([
-                                        parent.name, clone.name, 'paternal', 'POST_WGD_DUP',
+                                        parent.name, clone.name, 'paternal', 'DUP',
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{new_p_cna}'
                                     ])
@@ -1251,7 +1132,7 @@ class HCDSIM:
                             if clone.cna_status[start_idx] != parent.cna_status[start_idx] or parent.cna_status[start_idx] is not None:
                                 continue
                             
-                            num_windows_span = utils.generate_mixture_poisson()
+                            num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                             
                             # Get chromosome of the start position
                             start_chrom = ref['Chromosome'][start_idx]
@@ -1292,7 +1173,7 @@ class HCDSIM:
                         while i < total_bin_lens:
                             if clone.cna_status[i] == parent.cna_status[i] and parent.cna_status[i] is None:
                                 if np.random.binomial(1, self.cna_prob):
-                                    num_windows_span = utils.generate_mixture_poisson()
+                                    num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                                     
                                     # Get chromosome of the start position
                                     start_chrom = ref['Chromosome'][i]
@@ -1632,7 +1513,7 @@ class HCDSIM:
                     else:
                         temp_prob = np.random.binomial(1, self.cna_prob * 0.1)
                     if temp_prob:
-                        num_windows_span = utils.generate_mixture_poisson()
+                        num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
                         
                         # Check if we can place a CNA spanning num_windows_span bins
                         can_place = True
@@ -1713,14 +1594,14 @@ class HCDSIM:
                             if is_wgd:
                                 if m_cna != clone_m_cna:
                                     cell_changes.append([
-                                        clone.name, cell_id, 'maternal', 'POST_WGD_DUP',
+                                        clone.name, cell_id, 'maternal', 'DUP',
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{clone_m_cna}->{m_cna}'
                                     ])
                                 
                                 if p_cna != clone_p_cna:
                                     cell_changes.append([
-                                        clone.name, cell_id,'paternal', 'POST_WGD_DUP',
+                                        clone.name, cell_id,'paternal', 'DUP',
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{clone_p_cna}->{p_cna}'
                                     ])
@@ -2056,30 +1937,6 @@ class HCDSIM:
         change_df = pd.DataFrame(data=all_changes, columns=columns)
         change_df.to_csv(os.path.join(outdir, 'cell_changes.csv'), index=False)
 
-    def _merge_fasta_for_each_clone(self, root, outdir):
-        # merge fasta for each clone
-        queue = deque([root])
-        while queue:
-            clone = queue.popleft()
-            clone.fasta = os.path.join(outdir, clone.name+'.fasta')
-            command = """sed '/^>chr/ s/$/-A/' {0} > {1} && sed '/^>chr/ s/$/-B/' {2} >> {1}""".format(clone.maternal_fasta, clone.fasta, clone.paternal_fasta)
-            code = os.system(command)
-            queue.extend(clone.children)
-
-    def _wgsim_process(self, pe_reads, fasta, fq1, fq2):
-        #where yyy is the read length, zzz is the error rate and $xxx * $yyy = 10000000.
-        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,pe_reads,self.reads_len,fasta,fq1,fq2)
-        wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
-        utils.runcmd(command, wgsim_log)
-
-    def _run_wgsim_for_region(self, pe_reads, fasta_region_file, temp_fq1, temp_fq2):
-        """A helper function to run wgsim for a single small region."""
-        if pe_reads <= 0:
-            return
-        command = self.wgsim + " -e {0} -d {1} -s 35 -N {2} -1 {3} -2 {3} -r0 -R0 -X0 {4} {5} {6}".format(self.error_rate,self.insertion_size,pe_reads,self.reads_len,fasta_region_file,temp_fq1,temp_fq2)
-        wgsim_log = os.path.join(self.outdir, 'log/wgsim_log.txt')
-        utils.runcmd(command, wgsim_log)
-
     def _run_wgsim_for_window(self, args):
         """
         Worker function for generating reads for a single bin using wgsim
@@ -2252,17 +2109,6 @@ class HCDSIM:
         utils.runcmd(command, samtools_log)
         align_bar.progress(advance=True, msg="Finish alignment process for {}".format(clone))
 
-    # def _downsampling_cell_bam(self, job):
-    #     (ratio, clone_bam_file, cell_bam_file, log_dir) = job
-
-    #     samtools_log = os.path.join(log_dir, 'samtools_log.txt')
-    #     cell_name = os.path.splitext(os.path.basename(cell_bam_file))[0]
-
-    #     downsam_bar.progress(advance=False, msg="Downsampling cell bam for {}".format(cell_name))
-    #     command = "{0} view -@ {1} -b -s {2} {3} > {4}".format(self.samtools, self.thread, ratio, clone_bam_file, cell_bam_file)
-    #     utils.runcmd(command, samtools_log)
-    #     downsam_bar.progress(advance=True, msg="Finish downsampling cell bam for {}".format(cell_name))
-
     def _merge_bams_in_batches(self, output_file, input_files, batch_size=1000):
         samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
         dtmp = os.path.join(self.outdir, 'tmp')
@@ -2295,68 +2141,6 @@ class HCDSIM:
             for f in temp_merged:
                 os.remove(f)
 
-    # def _downsampling_cell_bam(self, job):
-    #     (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
-
-    #     samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-    #     dcell = os.path.join(self.outdir, 'cell_bams')
-    #     dtmp = os.path.join(self.outdir, 'tmp')
-
-    #     self.log(f"Downsampling cell bam for {cell}", level='PROGRESS')
-
-    #     clone_cnv_vector = np.array(clone_cnv)
-    #     cell_cnv_vector = np.array(cell_cnv)
-    #     temp_bam_files = []
-    #     tasks = []
-    #     for index, bin in enumerate(bins):
-    #         clone_cnv_value = clone_cnv_vector[index]
-    #         cell_cnv_value = cell_cnv_vector[index]
-    #         if clone_cnv_value == 0 or cell_cnv_value == 0:
-    #             continue
-    #         ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
-
-    #         chrom, pos = bin.split(':')
-    #         start, end = pos.split('-')
-
-    #         if ratio <=1:
-    #             temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}.bam")
-    #             command = "{0} view -b -s {1} {2} {3} > {4}".format(self.samtools, cell_index+ratio, clone_bam_file, bin, temp_bam_file)
-    #             tasks.append((command, samtools_log))
-    #             temp_bam_files.append(temp_bam_file)
-    #         else:
-    #             full_copies = int(ratio)  
-    #             fractional_part = ratio - full_copies
-                
-    #             for i in range(full_copies):
-    #                 temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_copy{i}.bam")
-    #                 command = "{0} view -b {1} {2} > {3}".format(
-    #                     self.samtools, clone_bam_file, bin, temp_bam)
-    #                 utils.runcmd(command, samtools_log)
-    #                 temp_bam_files.append(temp_bam)
-                
-    #             if fractional_part > 0:
-    #                 temp_bam = os.path.join(dtmp, f"{cell}_{mode}_window_{chrom}_{start}_{end}_frac.bam")
-    #                 random_seed = cell_index + fractional_part + full_copies
-    #                 command = "{0} view -b -s {1} {2} {3} > {4}".format(
-    #                     self.samtools, random_seed, clone_bam_file, bin, temp_bam)
-    #                 utils.runcmd(command, samtools_log)
-    #                 temp_bam_files.append(temp_bam)                
-        
-    #     with Pool(processes=self.thread) as pool:
-    #         pool.starmap(utils.runcmd, tasks)
-    
-    #     # merge all temp bam files
-    #     # write all temp bam files to a text file
-    #     cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-    #     self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
-
-    #     # clean temp bam files
-    #     for temp_bam_file in temp_bam_files:
-    #         if os.path.exists(temp_bam_file):
-    #             os.remove(temp_bam_file)
-        
-    #     self.log(f"Finish downsampling cell bam for {cell}", level='PROGRESS')
-        
     def _process_cell_bam(self, job):
         (cell, dcell, dtmp, dlog) = job
 
@@ -2461,6 +2245,236 @@ class HCDSIM:
         bcftools_bar.progress(advance=False, msg="Counting germinal SNPs on {}".format(cell))
         self._call_bcftools(snp_bed, cell_bam, cell_vcf_file, cell_count_file)
         bcftools_bar.progress(advance=True, msg="Finish germinal SNPs on {}".format(cell))
+
+    def _merge_consecutive_bins(self, bins):
+        """
+        Merge consecutive bins into segments
+        
+        Parameters:
+        -----------
+        bins : list
+            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
+        
+        Returns:
+        --------
+        list : List of merged region strings ['chr1:1-200000', ...]
+        """
+        if len(bins) == 0:
+            return []
+        
+        segments = []
+        current_segment = None
+        
+        for bin_range in bins:
+            # Parse bin
+            chrom, pos = bin_range.split(':')
+            start, end = pos.split('-')
+            start = int(start)
+            end = int(end)
+            
+            if current_segment is None:
+                # Start new segment
+                current_segment = {
+                    'chrom': chrom,
+                    'start': start,
+                    'end': end
+                }
+            elif (current_segment['chrom'] == chrom and 
+                current_segment['end'] + 1 == start):  # Check if consecutive
+                # Merge into current segment
+                current_segment['end'] = end
+            else:
+                # Save current segment and start new one
+                region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
+                segments.append(region_str)
+                
+                current_segment = {
+                    'chrom': chrom,
+                    'start': start,
+                    'end': end
+                }
+        
+        # Add the last segment
+        if current_segment is not None:
+            region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
+            segments.append(region_str)
+        
+        return segments
+
+    def _group_segments_by_cnv_ratio(self, bins, clone_cnv, cell_cnv):
+        """
+        Group bins into segments based on CNV ratio
+        
+        Strategy:
+        1. Group bins by CNV ratio (clone_cnv == cell_cnv as one group, others by ratio)
+        2. Within each group, merge consecutive bins into segments
+        
+        Parameters:
+        -----------
+        bins : list
+            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
+        clone_cnv : list or np.array
+            CNV values of clone
+        cell_cnv : list or np.array
+            CNV values of cell
+        
+        Returns:
+        --------
+        dict : Grouped segments by ratio
+            Key: ratio value (or 'same' for clone_cnv == cell_cnv)
+            Value: dict with 'segments', 'clone_cnv', 'cell_cnv'
+        """
+        if len(bins) == 0:
+            return {}
+        
+        # First, group bins by their CNV characteristics (preserve order)
+        temp_groups = {}
+        
+        for i, bin_range in enumerate(bins):
+            clone_cnv_val = clone_cnv[i]
+            cell_cnv_val = cell_cnv[i]
+            
+            # Skip zero values
+            if clone_cnv_val == 0 or cell_cnv_val == 0:
+                continue
+            
+            # Determine the group key
+            if clone_cnv_val == cell_cnv_val:
+                group_key = 'same'
+            else:
+                ratio = cell_cnv_val / clone_cnv_val
+                group_key = f'ratio_{ratio:.6f}'
+            
+            if group_key not in temp_groups:
+                temp_groups[group_key] = {
+                    'bins': [],
+                    'clone_cnv': clone_cnv_val,
+                    'cell_cnv': cell_cnv_val
+                }
+            
+            temp_groups[group_key]['bins'].append(bin_range)
+        
+        # Second, merge consecutive bins within each group into segments
+        groups = {}
+        for group_key, group_data in temp_groups.items():
+            segments = self._merge_consecutive_bins(group_data['bins'])
+            groups[group_key] = {
+                'segments': segments,
+                'clone_cnv': group_data['clone_cnv'],
+                'cell_cnv': group_data['cell_cnv']
+            }
+        
+        return groups
+
+    def _downsampling_cell_bam(self, job):
+        """Optimized version: grouping by CNV ratio + merging consecutive bins"""
+        (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
+
+        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
+        dcell = os.path.join(self.outdir, 'cell_bams')
+        dtmp = os.path.join(self.outdir, 'tmp')
+
+        downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {cell} ({mode})")
+
+        if clone_cnv == cell_cnv:
+            # Simple downsampling for the whole bam
+            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+            ratio = self.cell_coverage / self.clone_coverage
+            random_seed = cell_index + ratio
+            command = "{0} view -b -@ {1} -s {2} {3} -o {4}".format(
+                self.samtools, 
+                self.thread,
+                random_seed, 
+                clone_bam_file, 
+                cell_bam_file
+            )
+            utils.runcmd(command, samtools_log)
+        else:
+            # Group bins by CNV ratio and merge consecutive bins
+            groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
+            temp_bam_files = []
+            tasks = []
+            
+            for group_idx, (group_key, group_data) in enumerate(groups.items()):
+                segments = group_data['segments']
+                clone_cnv_value = group_data['clone_cnv']
+                cell_cnv_value = group_data['cell_cnv']
+                
+                # Calculate ratio
+                if group_key == 'same':
+                    # For regions where clone_cnv == cell_cnv
+                    ratio = self.cell_coverage / self.clone_coverage
+                else:
+                    # For regions where clone_cnv != cell_cnv
+                    ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
+                
+                if ratio <= 1:
+                    # Simple downsampling for all segments in this group
+                    temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}.bam")
+                    random_seed = cell_index + ratio
+                    
+                    # Build samtools command with multiple segments
+                    segments_str = ' '.join(segments)
+                    command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
+                        self.samtools, 
+                        self.thread,
+                        random_seed, 
+                        clone_bam_file, 
+                        segments_str,
+                        temp_bam_file
+                    )
+                    tasks.append((command, samtools_log))
+                    temp_bam_files.append(temp_bam_file)
+                    
+                else:
+                    # ratio > 1: need multiple sampling
+                    full_copies = int(ratio)
+                    fractional_part = ratio - full_copies
+                    
+                    segments_str = ' '.join(segments)
+                    
+                    # Full copies
+                    for i in range(full_copies):
+                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_copy{i}.bam")
+                        command = "{0} view -b -@ {1} {2} {3} -o {4}".format(
+                            self.samtools,
+                            self.thread,
+                            clone_bam_file, 
+                            segments_str,
+                            temp_bam
+                        )
+                        tasks.append((command, samtools_log))
+                        temp_bam_files.append(temp_bam)
+                    
+                    # Fractional part
+                    if fractional_part > 0:
+                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_frac.bam")
+                        random_seed = cell_index + fractional_part + full_copies
+                        command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
+                            self.samtools,
+                            self.thread,
+                            random_seed,
+                            clone_bam_file, 
+                            segments_str,
+                            temp_bam
+                        )
+                        tasks.append((command, samtools_log))
+                        temp_bam_files.append(temp_bam)
+            
+            for task in tasks:
+                command, log_file = task
+                utils.runcmd(command, log_file)
+            
+            # Merge all temp bam files
+            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
+            self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
+
+            # Clean up temporary files
+            for temp_bam_file in temp_bam_files:
+                if os.path.exists(temp_bam_file):
+                    os.remove(temp_bam_file)
+
+        downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {cell} ({mode})")
 
     @utils.log_runtime
     def gprofile(self):
@@ -2685,314 +2699,6 @@ class HCDSIM:
         self.log('Storing the tree to json file...', level='PROGRESS')
         random_tree.save_tree_to_file(root, tree_json)
         self.log('align BYEBYE')
-    
-    # @utils.log_runtime
-    # def downsam(self):
-    #     self.log('Setting directories', level='PROGRESS')
-    #     dprofile, dfasta, dfastq, dclone, dcell, dbarcode, drdr, dbaf, dtmp, dlog = self.setup_dir()
-
-    #     tree_json = os.path.join(dprofile, 'tree.json')
-    
-    #     utils.check_exist(tree_json=tree_json)
-        
-    #     # load object from file
-    #     root = random_tree.load_tree_from_file(tree_json)
-    #     all_clones = random_tree.collect_all_nodes(root)
-
-    #     # assign cells for each clone and generating job list
-    #     barcodes = []
-    #     jobs = []
-    #     for mode in ['maternal', 'paternal']:
-    #         clone_cnv_df = pd.read_csv(os.path.join(dprofile, f'clone_{mode}_cna_matrix.csv'), index_col=0)
-    #         cell_cnv_df = pd.read_csv(os.path.join(dprofile, f'cell_{mode}_cna_matrix.csv'), index_col=0)
-    #         for clone in all_clones:
-    #             # downsample maternal and paternal bam file for each cell
-    #             clone_bam_file = os.path.join(dclone, f'{clone.name}_{mode}.bam')
-    #             clone_cnv = clone_cnv_df[f'{clone.name}_{mode}_cnas'].tolist()
-    #             bins = clone_cnv_df.index.tolist()
-    #             for i in range(clone.cell_no):
-    #                 cell_name = clone.name + '_cell' + str(i+1)
-    #                 cell_cnv = cell_cnv_df[cell_name].tolist()
-    #                 jobs.append((clone.name, cell_name, mode, clone_bam_file, clone_cnv, cell_cnv, bins, i))
-    #                 barcodes.append(cell_name)
-
-    #     # set parallel jobs for each cell
-    #     # lock = Lock()
-    #     # counter = Value('i', 0)
-    #     # init_args = (lock, counter, len(jobs))
-    #     # pool = Pool(processes=1, initializer=init_downsam, initargs=init_args)
-        
-    #     # self.log('Downsampling cell bam...', level='PROGRESS')
-    #     # for _ in pool.imap_unordered(self._downsampling_cell_bam, jobs):
-    #     #     pass
-    #     # pool.close()
-    #     # pool.join()
-    #     for job in jobs:
-    #         self._downsampling_cell_bam(job)
-        
-    #     # merge cell maternal and paternal bam file
-    #     self.log('Merging maternal and paternal cell bam files...', level='PROGRESS')
-    #     for cell in barcodes:
-    #         maternal_bam = os.path.join(dcell, f'{cell}_maternal.bam')
-    #         paternal_bam = os.path.join(dcell, f'{cell}_paternal.bam')
-    #         merged_bam = os.path.join(dcell, f'{cell}.bam')
-    #         samtools_log = os.path.join(dlog, 'samtools_log.txt')
-    #         command = "{0} merge -@ {1} -f {2} {3} {4}".format(self.samtools, self.thread, merged_bam, maternal_bam, paternal_bam)
-    #         utils.runcmd(command, samtools_log)
-    #         # index merged bam file
-    #         command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, merged_bam)
-    #         utils.runcmd(command, samtools_log)
-    #         # remove maternal and paternal bam files
-    #         # if os.path.exists(maternal_bam):
-    #         #     os.remove(maternal_bam)
-    #         # if os.path.exists(maternal_bam + '.bai'):
-    #         #     os.remove(maternal_bam + '.bai')
-    #         # if os.path.exists(paternal_bam):
-    #         #     os.remove(paternal_bam)
-    #         # if os.path.exists(paternal_bam + '.bai'):
-    #         #     os.remove(paternal_bam + '.bai')
-        
-    #     self.log('Writing cell list to barcode.txt...', level='PROGRESS')
-    #     barcodes_file = os.path.join(dprofile, 'barcodes.txt')
-    #     with open(barcodes_file, 'w') as output:
-    #         for barcode in barcodes:
-    #             output.write(barcode+'\n')
-
-    #     self.log('Storing the tree to json file...', level='PROGRESS')
-    #     random_tree.save_tree_to_file(root, tree_json)
-    #     self.log('downsam BYEBYE')
-
-    def _merge_consecutive_bins(self, bins):
-        """
-        Merge consecutive bins into segments
-        
-        Parameters:
-        -----------
-        bins : list
-            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
-        
-        Returns:
-        --------
-        list : List of merged region strings ['chr1:1-200000', ...]
-        """
-        if len(bins) == 0:
-            return []
-        
-        segments = []
-        current_segment = None
-        
-        for bin_range in bins:
-            # Parse bin
-            chrom, pos = bin_range.split(':')
-            start, end = pos.split('-')
-            start = int(start)
-            end = int(end)
-            
-            if current_segment is None:
-                # Start new segment
-                current_segment = {
-                    'chrom': chrom,
-                    'start': start,
-                    'end': end
-                }
-            elif (current_segment['chrom'] == chrom and 
-                current_segment['end'] + 1 == start):  # Check if consecutive
-                # Merge into current segment
-                current_segment['end'] = end
-            else:
-                # Save current segment and start new one
-                region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
-                segments.append(region_str)
-                
-                current_segment = {
-                    'chrom': chrom,
-                    'start': start,
-                    'end': end
-                }
-        
-        # Add the last segment
-        if current_segment is not None:
-            region_str = f"{current_segment['chrom']}:{current_segment['start']}-{current_segment['end']}"
-            segments.append(region_str)
-        
-        return segments
-
-
-    def _group_segments_by_cnv_ratio(self, bins, clone_cnv, cell_cnv):
-        """
-        Group bins into segments based on CNV ratio
-        
-        Strategy:
-        1. Group bins by CNV ratio (clone_cnv == cell_cnv as one group, others by ratio)
-        2. Within each group, merge consecutive bins into segments
-        
-        Parameters:
-        -----------
-        bins : list
-            List of bins, format like ['chr1:1-100000', 'chr1:100001-200000', ...]
-        clone_cnv : list or np.array
-            CNV values of clone
-        cell_cnv : list or np.array
-            CNV values of cell
-        
-        Returns:
-        --------
-        dict : Grouped segments by ratio
-            Key: ratio value (or 'same' for clone_cnv == cell_cnv)
-            Value: dict with 'segments', 'clone_cnv', 'cell_cnv'
-        """
-        if len(bins) == 0:
-            return {}
-        
-        # First, group bins by their CNV characteristics (preserve order)
-        temp_groups = {}
-        
-        for i, bin_range in enumerate(bins):
-            clone_cnv_val = clone_cnv[i]
-            cell_cnv_val = cell_cnv[i]
-            
-            # Skip zero values
-            if clone_cnv_val == 0 or cell_cnv_val == 0:
-                continue
-            
-            # Determine the group key
-            if clone_cnv_val == cell_cnv_val:
-                group_key = 'same'
-            else:
-                ratio = cell_cnv_val / clone_cnv_val
-                group_key = f'ratio_{ratio:.6f}'
-            
-            if group_key not in temp_groups:
-                temp_groups[group_key] = {
-                    'bins': [],
-                    'clone_cnv': clone_cnv_val,
-                    'cell_cnv': cell_cnv_val
-                }
-            
-            temp_groups[group_key]['bins'].append(bin_range)
-        
-        # Second, merge consecutive bins within each group into segments
-        groups = {}
-        for group_key, group_data in temp_groups.items():
-            segments = self._merge_consecutive_bins(group_data['bins'])
-            groups[group_key] = {
-                'segments': segments,
-                'clone_cnv': group_data['clone_cnv'],
-                'cell_cnv': group_data['cell_cnv']
-            }
-        
-        return groups
-
-
-    def _downsampling_cell_bam(self, job):
-        """Optimized version: grouping by CNV ratio + merging consecutive bins"""
-        (clone, cell, mode, clone_bam_file, clone_cnv, cell_cnv, bins, cell_index) = job
-
-        samtools_log = os.path.join(self.outdir, 'log/samtools_log.txt')
-        dcell = os.path.join(self.outdir, 'cell_bams')
-        dtmp = os.path.join(self.outdir, 'tmp')
-
-        downsam_bar.progress(advance=False, msg=f"Downsampling cell bam for {cell} ({mode})")
-
-        if clone_cnv == cell_cnv:
-            # Simple downsampling for the whole bam
-            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-            ratio = self.cell_coverage / self.clone_coverage
-            random_seed = cell_index + ratio
-            command = "{0} view -b -@ {1} -s {2} {3} -o {4}".format(
-                self.samtools, 
-                self.thread,
-                random_seed, 
-                clone_bam_file, 
-                cell_bam_file
-            )
-            utils.runcmd(command, samtools_log)
-        else:
-            # Group bins by CNV ratio and merge consecutive bins
-            groups = self._group_segments_by_cnv_ratio(bins, clone_cnv, cell_cnv)
-            temp_bam_files = []
-            tasks = []
-            
-            for group_idx, (group_key, group_data) in enumerate(groups.items()):
-                segments = group_data['segments']
-                clone_cnv_value = group_data['clone_cnv']
-                cell_cnv_value = group_data['cell_cnv']
-                
-                # Calculate ratio
-                if group_key == 'same':
-                    # For regions where clone_cnv == cell_cnv
-                    ratio = self.cell_coverage / self.clone_coverage
-                else:
-                    # For regions where clone_cnv != cell_cnv
-                    ratio = (cell_cnv_value / clone_cnv_value) * (self.cell_coverage / self.clone_coverage)
-                
-                if ratio <= 1:
-                    # Simple downsampling for all segments in this group
-                    temp_bam_file = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}.bam")
-                    random_seed = cell_index + ratio
-                    
-                    # Build samtools command with multiple segments
-                    segments_str = ' '.join(segments)
-                    command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
-                        self.samtools, 
-                        self.thread,
-                        random_seed, 
-                        clone_bam_file, 
-                        segments_str,
-                        temp_bam_file
-                    )
-                    tasks.append((command, samtools_log))
-                    temp_bam_files.append(temp_bam_file)
-                    
-                else:
-                    # ratio > 1: need multiple sampling
-                    full_copies = int(ratio)
-                    fractional_part = ratio - full_copies
-                    
-                    segments_str = ' '.join(segments)
-                    
-                    # Full copies
-                    for i in range(full_copies):
-                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_copy{i}.bam")
-                        command = "{0} view -b -@ {1} {2} {3} -o {4}".format(
-                            self.samtools,
-                            self.thread,
-                            clone_bam_file, 
-                            segments_str,
-                            temp_bam
-                        )
-                        tasks.append((command, samtools_log))
-                        temp_bam_files.append(temp_bam)
-                    
-                    # Fractional part
-                    if fractional_part > 0:
-                        temp_bam = os.path.join(dtmp, f"{cell}_{mode}_group{group_idx:05d}_frac.bam")
-                        random_seed = cell_index + fractional_part + full_copies
-                        command = "{0} view -b -@ {1} -s {2} {3} {4} -o {5}".format(
-                            self.samtools,
-                            self.thread,
-                            random_seed,
-                            clone_bam_file, 
-                            segments_str,
-                            temp_bam
-                        )
-                        tasks.append((command, samtools_log))
-                        temp_bam_files.append(temp_bam)
-            
-            for task in tasks:
-                command, log_file = task
-                utils.runcmd(command, log_file)
-            
-            # Merge all temp bam files
-            cell_bam_file = os.path.join(dcell, f'{cell}_{mode}.bam')
-            self._merge_bams_in_batches(cell_bam_file, temp_bam_files, batch_size=1000)
-
-            # Clean up temporary files
-            for temp_bam_file in temp_bam_files:
-                if os.path.exists(temp_bam_file):
-                    os.remove(temp_bam_file)
-
-        downsam_bar.progress(advance=True, msg=f"Finished downsampling cell bam for {cell} ({mode})")
 
     @utils.log_runtime
     def downsam(self):

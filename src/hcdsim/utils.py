@@ -149,82 +149,6 @@ def parseIgnoreList(ignorefile):
                 ignorelist.append(line.strip())
     return ignorelist
 
-def random_cna():
-    # 定义数字和对应的概率e
-    numbers = [0, 2, 3, 4, 5]
-    probabilities = [0.2, 0.3, 0.25, 0.15, 0.1]
-
-    # 使用choices函数进行随机选择，weights参数指定概率
-    return random.choices(numbers, weights=probabilities)[0]
-
-def random_mirrored_cna():
-    # 定义数字和对应的概率e
-    numbers = [2, 3, 4, 5, 6, 7, 8, 9]
-    probabilities = [0.05, 0.2, 0.3, 0.2, 0.1, 0.05, 0.05, 0.05]
-
-    # 使用choices函数进行随机选择，weights参数指定概率
-    return random.choices(numbers, weights=probabilities)[0]
-
-def random_WGD():
-    # 定义数字和对应的概率e
-    numbers = [2, 3, 4, 5]
-    probabilities = [0.5, 0.3, 0.15, 0.05]
-
-    # 使用choices函数进行随机选择，weights参数指定概率
-    return random.choices(numbers, weights=probabilities)[0]
-
-def random_CNL():
-    # 定义数字和对应的概率e
-    numbers = [1, 2, 3, 4, 5]
-    probabilities = [0.4, 0.3, 0.15, 0.1, 0.05]
-
-    # 使用choices函数进行随机选择，weights参数指定概率
-    return random.choices(numbers, weights=probabilities)[0]
-
-def assign_cells_to_clones(cell_no, clone_no):
-    # # Ensure at least one cell for each clone
-    # clones = [1] * clone_no
-    # remaining_cells = cell_no - clone_no
-
-    # # Assign remaining cells to clones
-    # for _ in range(remaining_cells):
-    #     clone_index = random.randint(0, clone_no - 1)
-    #     clones[clone_index] += 1
-
-    # return clones
-    # Initialize a list to hold the number of cells assigned to each clone
-    clones = [0] * clone_no
-    
-    # Distribute the cells to the clones
-    for i in range(cell_no):
-        # Determine which clone to assign the current cell to
-        clone_index = i % clone_no
-        # Increment the cell count for the determined clone
-        clones[clone_index] += 1
-    
-    return clones
-
-def random_sampling(m, n, k):
-    # m for total reads no, n for cell no, k for per reads no in cell
-    if n * k < m:
-        # Randomly sample without replacement
-        sampled_lines = random.sample(range(m), n * k)
-    else:
-        # Randomly sample with replacement
-        sampled_lines = [random.randint(0, m - 1) for _ in range(n * k)]
-
-    # Reshape the sampled lines into a 2D array
-    sampled_lines_2d = [sorted(sampled_lines[i:i+k]) for i in range(0, len(sampled_lines), k)]
-    
-    # add three lines to each line index
-    new_sampled_lines_2d = []
-    for lines in sampled_lines_2d:
-        temp = []
-        for line in lines:
-            temp += [line*4+1, line*4+2, line*4+3, line*4+4]
-        new_sampled_lines_2d.append(temp)
-    return new_sampled_lines_2d
-
 def root_path():
     return os.path.dirname(os.path.abspath(__file__))
 
@@ -240,22 +164,10 @@ class bcolors:
     UNDERLINE = '\033[4m'  # 用于下划线
 
 
-# ProgressBar 在命令行界面显示进度条，向用户提供任务完成的百分比和状态更新。
 class ProgressBar:
 
     def __init__(self, total, length, lock=None, counter=0, verbose=False, decimals=1, fill=chr(9608),
                  prefix='Progress:', suffix='Complete'):
-        """
-        :param total: 任务的总步骤数。
-        :param length: 进度条的长度，以字符为单位。
-        :param lock: 用于线程安全的锁，如果进度条在多线程环境中使用，需要这个参数。
-        :param counter: 当前任务完成的步骤数，默认为0。
-        :param verbose: 是否显示详细的信息，默认为False。
-        :param decimals: 进度百分比的小数位数。
-        :param fill: 进度条中填充部分的字符，默认为 █ ,这是一个标准的块状字符
-        :param prefix: 进度条前缀，默认为"Progress:"。
-        :param suffix: 进度条后缀，默认为"Complete"。
-        """
         self.total = total
         self.length = length
         self.decimals = decimals
@@ -268,11 +180,6 @@ class ProgressBar:
         self.verbose = verbose
 
     def progress(self, advance=True, msg=""):
-        """
-        更新进度条的状态。
-        :param advance: 是否增加计数器，进度增加，默认为True。
-        :param msg: 要显示的附加信息。
-        """
         if self.lock is None:
             self.progress_unlocked(advance, msg)
         else:
@@ -280,12 +187,6 @@ class ProgressBar:
         return True
 
     def progress_unlocked(self, advance, msg):
-        """
-        更新进度条的状态，不使用锁。
-        :param advance: 是否增加计数器，进度增加，默认为True。
-        :param msg: 要显示的附加信息。
-        :return:
-        """
         flush = sys.stderr.flush
         write = sys.stderr.write
         if advance:
@@ -307,12 +208,6 @@ class ProgressBar:
             flush()
 
     def progress_locked(self, advance, msg):
-        """
-        更新进度条的状态，*使用锁。
-        :param advance: 是否增加计数器，进度增加，默认为True。
-        :param msg: 要显示的附加信息。
-        :return:
-        """
         flush = sys.stderr.flush
         write = sys.stderr.write
         # 1. 更新操作
@@ -350,16 +245,7 @@ class ProgressBar:
                 write("\n")
                 flush()
 
-# def error(msg):
-#     log(msg=msg, level="ERROR")
-#     sys.exit(0)
-
 def which(program):
-    """
-    查找并返回一个可执行文件的路径。如果找到了，它就返回该文件的路径；如果没有找到，它就返回None。
-    :param program:
-    :return:
-    """
     import os
     def is_exe(fpath):
         # 检查给定的文件路径是否存在并且具有执行权限。
@@ -633,11 +519,11 @@ def log_runtime(func):
         return result
     return wrapper
 
-def generate_mixture_poisson():
+def generate_mixture_poisson(weights, lambdas):
     """Generate a random sample from a mixture of Poisson distributions with specified weights and lambda parameters.
     """
-    weights = [0.3, 0.4, 0.2, 0.1]
-    lambdas = [5, 20, 100, 300]
+    # weights = [0.3, 0.4, 0.2, 0.1]
+    # lambdas = [5, 20, 100, 300]
     component = np.random.choice(len(lambdas), p=weights)
     sample = max(1, np.random.poisson(lambdas[component]))
     return sample
@@ -817,44 +703,25 @@ def lorenz_to_beta(x0, y0):
     return alpha, beta
 
 def find_segment_type(df, child, chromosome, bin_start, bin_end):
-    """
-    查找bin所属的segment type
-    
-    参数:
-        df: 包含segment数据的DataFrame
-        chromosome: 染色体名称，如 'chr1'
-        bin_start: bin的起始位置
-        bin_end: bin的结束位置
-        child: 克隆名称，默认'clone1'
-    
-    返回:
-        type值或None（如果未找到）
-    """
-    # 筛选对应的child
     child_df = df[df['Child'] == child].copy()
     
-    # 解析Segment列
     for idx, row in child_df.iterrows():
         segment = row['Segment']
         
-        # 解析格式: chr1:1-248956422
         parts = segment.split(':')
         seg_chr = parts[0]
         
         if seg_chr != chromosome:
             continue
             
-        # 解析起止位置
         positions = parts[1].split('-')
         seg_start = int(positions[0])
         seg_end = int(positions[1])
         
-        # 检查bin是否在segment区间内
-        # bin完全在segment内，或有重叠
         if bin_start <= seg_end and bin_end >= seg_start:
             return row['Type']
     
-    return None  # 未找到匹配的segment
+    return None
 
 def generate_bin_regions(fasta_file, bin_size):
     """
@@ -881,10 +748,6 @@ def generate_bin_regions(fasta_file, bin_size):
             bin_idx += 1
     
     return bins
-
-# ============================================================================
-# Coverage Sampling with Gaussian Copula
-# ============================================================================
 
 def sample_coverage_with_correlation(n_bins, alpha, beta, correlation_length=10):
     """
