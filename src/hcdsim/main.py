@@ -73,7 +73,7 @@ class HCDSIM:
                 weights: Optional[List[float]] = None,
                 lambdas: Optional[List[int]] = None,
                 clone_coverage: float = 30, 
-                cell_coverage: float = 0.5, 
+                cell_coverage: float = 0.01, 
                 reads_len: int = 150, 
                 insertion_size: int = 350, 
                 error_rate: float = 0.02, 
