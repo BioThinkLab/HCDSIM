@@ -2218,9 +2218,9 @@ class HCDSIM:
         ref_bed = os.path.join(dtmp, 'rdr_reference.bed')
 
         # use bedtools to get coverage for each cell bam
-        cov_bar.progress(advance=False, msg="Counting germinal SNPs on {}".format(cell))
+        cov_bar.progress(advance=False, msg="Counting reads count on {}".format(cell))
         self._call_bedtools(cell_bam, ref_bed, coverage_file)
-        cov_bar.progress(advance=True, msg="Finish germinal SNPs on {}".format(cell))
+        cov_bar.progress(advance=True, msg="Finish reads count on {}".format(cell))
 
     def _call_bcftools(self, snps_bed_file, bam_file, vcf_file, count_file):
         bcftools_log = os.path.join(self.outdir, 'log/bcftools_log.txt')
