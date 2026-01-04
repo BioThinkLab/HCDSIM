@@ -412,13 +412,62 @@ def balance_tree(root, balance_factor=0.8):
     # Update depths after pruning
     update_depths(root)
 
-def assign_cells_to_all_nodes(root, cell_num):
+# def assign_cells_to_all_nodes(root, cell_num):
+#     """
+#     Assign cells to all nodes of the tree, not just leaves.
+    
+#     Parameters:
+#     - root: Root node of the tree
+#     - cell_num: Total number of cells to distribute
+    
+#     Returns:
+#     - Updated tree with cell_no assigned to all nodes
+#     """
+#     # Collect all nodes in the tree iteratively
+#     all_nodes = []
+#     queue = [root]
+    
+#     while queue:
+#         node = queue.pop(0)
+#         all_nodes.append(node)
+#         queue.extend(node.children)
+    
+#     # Assign cells proportionally to all nodes, with more cells to deeper nodes
+#     # Calculate weighted distribution based on depth
+#     total_weight = 0
+#     weights = []
+    
+#     for node in all_nodes:
+#         # Give higher weight to deeper nodes (more evolved clones)
+#         weight = 1.0 + node.depth * 0.5
+#         weights.append(weight)
+#         total_weight += weight
+    
+#     # Distribute cells based on weights
+#     remaining_cells = cell_num
+#     for i, node in enumerate(all_nodes):
+#         # Calculate cell allocation proportionally
+#         node_cells = int((weights[i] / total_weight) * cell_num)
+#         node.cell_no = node_cells
+#         remaining_cells -= node_cells
+    
+#     # Distribute any remaining cells due to rounding
+#     for i in range(remaining_cells):
+#         all_nodes[i % len(all_nodes)].cell_no += 1
+    
+#     return root
+
+def assign_cells_to_all_nodes(root, cell_num, mode=2):
     """
-    Assign cells to all nodes of the tree, not just leaves.
+    Assign cells to all nodes of the tree based on the selected distribution mode.
     
     Parameters:
     - root: Root node of the tree
     - cell_num: Total number of cells to distribute
+    - mode: Distribution strategy (int)
+        0: Uniform distribution (all nodes get roughly equal cells)
+        1: Depth-decreasing (deeper nodes get fewer cells - ancestral dominance)
+        2: Depth-increasing (deeper nodes get more cells - evolved dominance)
     
     Returns:
     - Updated tree with cell_no assigned to all nodes
@@ -432,26 +481,43 @@ def assign_cells_to_all_nodes(root, cell_num):
         all_nodes.append(node)
         queue.extend(node.children)
     
-    # Assign cells proportionally to all nodes, with more cells to deeper nodes
-    # Calculate weighted distribution based on depth
-    total_weight = 0
+    # Calculate weights based on the selected mode
     weights = []
+    gamma = 0.5 # Scaling factor
     
     for node in all_nodes:
-        # Give higher weight to deeper nodes (more evolved clones)
-        weight = 1.0 + node.depth * 0.5
+        if mode == 0:
+            # Uniform distribution
+            weight = 1.0
+        elif mode == 1:
+            # Deeper nodes get fewer cells (Ancestral Dominance)
+            # Using inverse relationship
+            weight = 1.0 / (1.0 + node.depth * gamma)
+        elif mode == 2:
+            # Deeper nodes get more cells (Evolved Dominance)
+            # Original logic
+            weight = 1.0 + node.depth * gamma
+        else:
+            raise ValueError("Mode must be 0, 1, or 2")
+            
         weights.append(weight)
-        total_weight += weight
+    
+    total_weight = sum(weights)
     
     # Distribute cells based on weights
     remaining_cells = cell_num
     for i, node in enumerate(all_nodes):
         # Calculate cell allocation proportionally
-        node_cells = int((weights[i] / total_weight) * cell_num)
+        if total_weight > 0:
+            node_cells = int((weights[i] / total_weight) * cell_num)
+        else:
+            node_cells = 0 # Should not happen unless weights are 0
+            
         node.cell_no = node_cells
         remaining_cells -= node_cells
     
     # Distribute any remaining cells due to rounding
+    # (Simple round-robin to the first few nodes)
     for i in range(remaining_cells):
         all_nodes[i % len(all_nodes)].cell_no += 1
     
@@ -459,7 +525,7 @@ def assign_cells_to_all_nodes(root, cell_num):
 
 def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, 
                       treedepth=4, treedepthsigma=0.5, max_children=3, 
-                      balance_factor=0.8, seed=None):
+                      balance_factor=0.8, mode=0, seed=None):
     """
     Generate a random tree using the Beta Splitting Model, ensuring a tree is always produced.
     This function is robust and avoids recursion errors.
@@ -528,7 +594,7 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0,
         # Avoid balancing on the fallback tree to ensure clone count.
     
     # Final Step: Assign cells to the chosen tree.
-    assign_cells_to_all_nodes(best_tree, cell_num)
+    assign_cells_to_all_nodes(best_tree, cell_num, mode=mode)
     
     return best_tree
 
