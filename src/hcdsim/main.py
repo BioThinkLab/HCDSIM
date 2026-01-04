@@ -2832,7 +2832,7 @@ class HCDSIM:
 
         # write ref to bed file to drdr without header and index
         ref['Start'] = ref['Start'] - 1
-        ref = ref['Chromosome', 'Start', 'End']
+        ref = ref[['Chromosome', 'Start', 'End']]
         ref.to_csv(os.path.join(dtmp, 'rdr_reference.bed'), sep='\t', index=False, header=False)
 
         # load cell list from barcode file
@@ -2943,6 +2943,7 @@ class HCDSIM:
         snp_baf.to_csv(os.path.join(dbaf, 'baf.snp.tsv'), sep='\t', index_label='snp_id')
         
         ref_bed = os.path.join(dtmp, 'baf_reference.bed')
+        ref = ref[['Chromosome', 'Start', 'End']]
         ref.to_csv(ref_bed, sep='\t', index=False, header=False)
 
         # use bedtools to get intersect of a_allele, b_allele and reference bed files
