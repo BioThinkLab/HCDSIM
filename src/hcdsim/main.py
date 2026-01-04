@@ -2832,6 +2832,7 @@ class HCDSIM:
 
         # write ref to bed file to drdr without header and index
         ref['Start'] = ref['Start'] - 1
+        ref = ref['Chromosome', 'Start', 'End']
         ref.to_csv(os.path.join(dtmp, 'rdr_reference.bed'), sep='\t', index=False, header=False)
 
         # load cell list from barcode file
