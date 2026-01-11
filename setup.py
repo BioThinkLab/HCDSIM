@@ -35,17 +35,17 @@ setuptools.setup(
     packages=setuptools.find_packages(where="src"),
     python_requires=">=3.6",
     install_requires=[
-        'pandas',
-        'numpy>=1.16.1,<1.25',
-        'matplotlib>=3.0.2',
-        'networkx>=3.2.1',
-        'scikit-learn',
-        'biopython',
+        "pandas",
+        "numpy>=1.16.1,<1.25",
+        "scipy",
+        "matplotlib>=3.0.2",
+        "networkx>=3.2.1",
+        "scikit-learn",
+        "pyfaidx",
     ],
     entry_points={
         'console_scripts': [
             'hcdsim=hcdsim.bin.hcdsim_main:main',
-            'hcdbench=hcdsim.bin.hcdbench_main:main'
         ],
     },
 )
