@@ -23,3 +23,9 @@ Benchmark utilities and the `hcdbench` command have been added!
 ### 1.3.0 <sup><sub>`2025-03-01`</sub></sup>
 
 `rdr` and `baf` subcommands have been added!
+
+## Version 2.0.0
+
+### 2.0.0 <sup><sub>`2026-01-10`</sub></sup>
+
+New version of HCDSIM is released!

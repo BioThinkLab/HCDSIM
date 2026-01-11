@@ -3,40 +3,67 @@
 `hcdsim sim` command to run the complete pipeline starting from the required reference genome.
 
 ```shell
-usage: hcdsim sim [-h] [-r] [-o] [-g] [-b] [-cno] [-eno] [-t] [-d] [-cp] [-wgd] [-wcl] [-loh] [-goh] [-m] [-l] [-p] [-hr] [-c] [-rl] [-i] [-e] [-cc] [--wgsim] [--bwa] [--samtools]
+usage: hcdsim sim [-h] [-r] [-o] [-g] [-b] [-gv] [-cno] [-eno] [-t] [--random_seed] [--tree_alpha] [--tree_beta] [-d] [--tree_depth_sigma]
+                  [--max_node_children] [--tree_balance_factor] [--tree_newwick] [--tree_mode] [-l] [-p] [-hr] [-cp] [--del_prob] [--cna_copy_param]
+                  [--max_cna_value] [--max_ploidy] [--weights] [--lambdas] [-wgd] [--chrom_cna_no] [--chrom_arm_rate] [-loh] [-goh] [--unique_ratio]
+                  [-c] [-rl] [-i] [-e] [--lorenz_x] [--lorenz_y] [--window_size] [--correlation_len] [-cc] [-bcl] [--wgsim] [--bwa] [--samtools]
+                  [--bedtools] [--bcftools]
 
 options:
   -h, --help            show this help message and exit
-  -r , --ref-genome     Path to reference genome [required]
+  -r , --ref_genome     Path to reference genome [required]
   -o , --outdir         Output directory (default: current directory)
-  -g , --ignore         Path to the exclusion list of contigs file containing a line-per-line list with chromosome names to ignore in the reference (default: none)
-  -b , --bin-size       The fixed bin size, with or without "kb" or "Mb" (default: 5Mb)
-  -cno , --clone-no     The random clone number contained in evolution tree, including normal clone (default: 3)
-  -eno , --cell-no      The total cell number for this simultion dataset (deafult: 5)
-  -t , --thread         Number of parallele jobs to use (default: equal to number of available processors)
-  -d , --max-tree-depth
+  -g , --ignore         Path to the exclusion list of contigs file (default: none)
+  -b , --bin_size       The fixed bin size, with or without "kb" or "Mb" (default: 100kb)
+  -gv , --genome_version 
+                        Genome version: hg19 or hg38 (default: hg38)
+  -cno , --clone_no     The clone number contained in evolution tree, including normal clone (default: 2)
+  -eno , --cell_no      The total cell number for this simulation dataset (default: 2)
+  -t , --thread         Number of parallel jobs to use (default: equal to number of available processors)
+  --random_seed         Random seed for reproducibility (default: none)
+  --tree_alpha          Alpha parameter for beta-splitting tree model (default: 10.0)
+  --tree_beta           Beta parameter for beta-splitting tree model (default: 10.0)
+  -d , --max_tree_depth 
                         The maximum depth of random evolution tree (default: 4)
-  -cp , --cna-prob-cutoff
-                        The cutoff probability of a bin undergoing CNA, if random probability is larger than cutoff, CNA happens (default: 0.8)
-  -wgd , --wgd-cna-no   Number of clonal whole-genome duplications (WGDs) to introduce in the ancestor of tumor evolution (default: 0)
-  -wcl , --wcl-cna-no   Number of clonal whole-chromosome losses (WCLs) to introduce in the ancestor of tumor evolution (default: 0)
-  -loh , --loh-cna-no   Number of loss of heterozygosity (LOH) CNAs to introduce in the each clone of tumor evolution, including CNL_LOH, CNN_LOH, CNG_LOH (default: 30)
-  -goh , --goh-cna-no   Number of gain of heterozygosity (GOH) CNAs to introduce in the each clone of tumor evolution (default: 10)
-  -m , --mirror-cna-no
-                        Number of mirror CNAs to introduce in the each clone of tumor evolution (default: 10)
-  -l , --snp-list       Path to the known germline SNPs file containing a SNP positions to add in the simulate human genome in the format "#CHR POSITION REF_ALLELES ALT_ALLELES" with first line as headline (default: none, SNPs are
-                        placed randomly)
-  -p , --snp-ratio      Ratio of SNPs to place randomly when a snp file is not given (snp-ratio is requried only whether snp-list is not provided. default: 0.001).
-  -hr , --heho-ratio    Ratio of heterozygous SNPs compared to homozygous ones (default: 0.67)
-  -c , --clone-coverage
+  --tree_depth_sigma    Sigma for tree depth variation (default: 0.5)
+  --max_node_children   Maximum number of children per node (default: 4)
+  --tree_balance_factor 
+                        Balance factor for tree generation (default: 0.8)
+  --tree_newwick        Path to a newick format tree file (default: none, generate random tree)
+  --tree_mode           Tree generation mode (default: 0)
+  -l , --snp_list       Path to the known germline SNPs file (default: none, SNPs are placed randomly)
+  -p , --snp_ratio      Ratio of SNPs to place randomly when a snp file is not given (default: 0.001)
+  -hr , --heho_ratio    Ratio of heterozygous SNPs compared to homozygous ones (default: 0.67)
+  -cp , --cna_prob      The probability of a bin undergoing CNA (default: 0.02)
+  --del_prob            Probability of deletion vs duplication (default: 0.2)
+  --cna_copy_param      Parameter for geometric distribution of copy number (default: 0.5)
+  --max_cna_value       Maximum CNA value allowed (default: 10)
+  --max_ploidy          Maximum ploidy for WGD events (default: none)
+  --weights             Comma-separated weights for mixture Poisson distribution of CNA length, e.g., "0.3,0.4,0.2,0.1"
+  --lambdas             Comma-separated lambda values for mixture Poisson distribution of CNA length, e.g., "5,20,100,300"
+  -wgd, --wgd           Enable whole-genome duplication (WGD) in tumor evolution (default: False)
+  --chrom_cna_no        Number of chromosomes to have chromosome-level CNAs (default: 2)
+  --chrom_arm_rate      Rate of arm-level vs whole-chromosome CNAs (default: 0.75)
+  -loh , --loh_cna_no   Number of LOH CNAs per clone (default: 15)
+  -goh , --goh_cna_no   Number of GOH CNAs per clone (default: 5)
+  --unique_ratio        Ratio of cells with unique mutations per clone (default: 0.5)
+  -c , --clone_coverage 
                         The reads coverage for clone (default: 30)
-  -rl , --reads-len     The length of the reads in FASTQ (default: 150)
-  -i , --insertion-size
+  -rl , --reads_len     The length of the reads in FASTQ (default: 150)
+  -i , --insertion_size 
                         The outer distance between the two ends (default: 350)
-  -e , --error-rate     The base error rate (default: 0.0)
-  -cc , --cell-coverage
-                        The reads coverage for clone (default: 0.5)
-  --wgsim               Path to the executable "wgsim" fileexecutable (default: in $PATH)
+  -e , --error_rate     The base error rate (default: 0.02)
+  --lorenz_x            Lorenz curve x parameter for coverage bias (default: 0.5)
+  --lorenz_y            Lorenz curve y parameter for coverage bias (default: 0.35)
+  --window_size         Window size for read generation (default: 200000)
+  --correlation_len     Correlation length for coverage simulation (default: 10)
+  -cc , --cell_coverage 
+                        The reads coverage for cell (default: 0.01)
+  -bcl , --barcode_len 
+                        Length of barcodes (default: 12)
+  --wgsim               Path to the executable "wgsim" file (default: in $PATH)
   --bwa                 Path to the executable "bwa" file (default: in $PATH)
   --samtools            Path to the executable "samtools" file (default: in $PATH)
+  --bedtools            Path to the executable "bedtools" file (default: in $PATH)
+  --bcftools            Path to the executable "bcftools" file (default: in $PATH)
 ```
