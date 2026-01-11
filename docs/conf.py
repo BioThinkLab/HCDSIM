@@ -6,10 +6,10 @@ from sphinx.application import Sphinx
 
 project = "HCDSIM"
 author = "Xikang Feng"
-repository_url = "https://github.com/xikanfeng2/HCDSIM"
+repository_url = "https://github.com/BioThinkLab/HCDSIM"
 copyright = f"{datetime.now():%Y}, Xikang Feng."
-version = "1.0.0"
-release = "1.0.0"
+version = "2.0.0"
+release = "2.0.0"
 
 def linkcode_resolve(domain, info):
     if domain != 'py':
