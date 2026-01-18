@@ -2761,6 +2761,14 @@ class HCDSIM:
             command = "{0} index -@ {1} {2}".format(self.samtools, self.thread, merged_bam)
             utils.runcmd(command, samtools_log)
         
+            if os.path.exists(merged_bam):
+                os.remove(maternal_bam)
+                os.remove(paternal_bam)
+            if os.path.exists(merged_bam + '.bai'):
+                if os.path.exists(maternal_bam + '.bai'):
+                    os.remove(maternal_bam + '.bai')
+                if os.path.exists(paternal_bam + '.bai'):
+                    os.remove(paternal_bam + '.bai')
         self.log('Writing cell list to barcode.txt...', level='PROGRESS')
         barcodes_file = os.path.join(dprofile, 'barcodes.txt')
         with open(barcodes_file, 'w') as output:
