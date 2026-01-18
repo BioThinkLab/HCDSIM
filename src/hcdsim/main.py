@@ -2153,7 +2153,7 @@ class HCDSIM:
         rg_dedup_bam_file = os.path.join(dcell, cell + ".rg.bam")
         samtools_log = os.path.join(dlog, 'samtools_log.txt')
         # picard_log = os.path.join(dlog, 'picard_log.txt')
-        tmp_files = [bam_file, query_sorted_bam_file, fixed_sorted_bam_file, sorted_bam_file, rg_dedup_bam_file]
+        tmp_files = [bam_file, query_sorted_bam_file, fixed_sorted_bam_file, rg_dedup_bam_file]
 
         # run samtools sort bam
         pbam_bar.progress(advance=False, msg="Samtools sort by query name for {}".format(cell))
