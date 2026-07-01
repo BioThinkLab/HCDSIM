@@ -457,7 +457,7 @@ def balance_tree(root, balance_factor=0.8):
     
 #     return root
 
-def assign_cells_to_all_nodes(root, cell_num, mode=2):
+def assign_cells_to_all_nodes(root, cell_num, mode=0):
     """
     Assign cells to all nodes of the tree based on the selected distribution mode.
     
@@ -598,7 +598,7 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0,
     
     return best_tree
 
-def load_tree_from_newick(newick_string, cell_num=1000):
+def load_tree_from_newick(newick_string, cell_num=1000, mode=0):
     """
     Load a tree from Newick format string and prepare it for use.
     Performs the same post-processing as generate_tree_beta:
@@ -766,7 +766,7 @@ def load_tree_from_newick(newick_string, cell_num=1000):
     update_depths(root)
     
     # Assign cells proportionally to all clone nodes
-    assign_cells_to_all_nodes(root, cell_num)
+    assign_cells_to_all_nodes(root, cell_num, mode=mode)
     
     return root
 

@@ -2497,7 +2497,7 @@ class HCDSIM:
             newwick_str = ''
             with open(self.tree_newwick, 'r') as f:
                 newick_string = f.read()
-            root = random_tree.load_tree_from_newick(newick_string)
+            root = random_tree.load_tree_from_newick(newick_string, mode=self.tree_mode)
         else:
             self.log('Generating random cell-lineage tree...', level='PROGRESS')
             root = random_tree.generate_tree_beta(cell_num=self.cell_no, num_clones=self.clone_no-1, alpha=self.tree_alpha, beta=self.tree_beta, treedepth=self.max_tree_depth, treedepthsigma=self.tree_depth_sigma, max_children=self.max_node_children, balance_factor=self.tree_balance_factor, mode=self.tree_mode, seed=self.random_seed)
