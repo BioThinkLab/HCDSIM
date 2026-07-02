@@ -524,7 +524,7 @@ def balance_tree(root, balance_factor=0.8):
 #     return root
 
 
-def assign_cells_to_all_nodes(root, cell_num, mode=0, jitter=0.15, seed=None):
+def assign_cells_to_all_nodes(root, cell_num, mode=0, jitter=0.05, seed=None):
     """
     Assign cells to all nodes of the tree based on the selected distribution mode.
 
@@ -673,7 +673,7 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0,
         # Avoid balancing on the fallback tree to ensure clone count.
     
     # Final Step: Assign cells to the chosen tree.
-    assign_cells_to_all_nodes(best_tree, cell_num, mode=mode)
+    assign_cells_to_all_nodes(best_tree, cell_num, mode=mode, jitter=jitter)
     
     return best_tree
 
