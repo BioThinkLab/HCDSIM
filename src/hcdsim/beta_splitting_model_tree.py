@@ -604,7 +604,7 @@ def assign_cells_to_all_nodes(root, cell_num, mode=0, jitter=0.15, seed=None):
 
 def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, 
                       treedepth=4, treedepthsigma=0.5, max_children=3, 
-                      balance_factor=0.8, mode=0, seed=None):
+                      balance_factor=0.8, mode=0, seed=None, jitter=0.05):
     """
     Generate a random tree using the Beta Splitting Model, ensuring a tree is always produced.
     This function is robust and avoids recursion errors.
@@ -677,7 +677,7 @@ def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0,
     
     return best_tree
 
-def load_tree_from_newick(newick_string, cell_num=1000, mode=0):
+def load_tree_from_newick(newick_string, cell_num=1000, mode=0, jitter=0.05):
     """
     Load a tree from Newick format string and prepare it for use.
     Performs the same post-processing as generate_tree_beta:
@@ -845,7 +845,7 @@ def load_tree_from_newick(newick_string, cell_num=1000, mode=0):
     update_depths(root)
     
     # Assign cells proportionally to all clone nodes
-    assign_cells_to_all_nodes(root, cell_num, mode=mode)
+    assign_cells_to_all_nodes(root, cell_num, mode=mode, jitter=jitter)
     
     return root
 
