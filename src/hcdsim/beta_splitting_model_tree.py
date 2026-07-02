@@ -457,10 +457,77 @@ def balance_tree(root, balance_factor=0.8):
     
 #     return root
 
-def assign_cells_to_all_nodes(root, cell_num, mode=0):
+# def assign_cells_to_all_nodes(root, cell_num, mode=0):
+#     """
+#     Assign cells to all nodes of the tree based on the selected distribution mode.
+    
+#     Parameters:
+#     - root: Root node of the tree
+#     - cell_num: Total number of cells to distribute
+#     - mode: Distribution strategy (int)
+#         0: Uniform distribution (all nodes get roughly equal cells)
+#         1: Depth-decreasing (deeper nodes get fewer cells - ancestral dominance)
+#         2: Depth-increasing (deeper nodes get more cells - evolved dominance)
+    
+#     Returns:
+#     - Updated tree with cell_no assigned to all nodes
+#     """
+#     # Collect all nodes in the tree iteratively
+#     all_nodes = []
+#     queue = [root]
+    
+#     while queue:
+#         node = queue.pop(0)
+#         all_nodes.append(node)
+#         queue.extend(node.children)
+    
+#     # Calculate weights based on the selected mode
+#     weights = []
+#     gamma = 0.5 # Scaling factor
+    
+#     for node in all_nodes:
+#         if mode == 0:
+#             # Uniform distribution
+#             weight = 1.0
+#         elif mode == 1:
+#             # Deeper nodes get fewer cells (Ancestral Dominance)
+#             # Using inverse relationship
+#             weight = 1.0 / (1.0 + node.depth * gamma)
+#         elif mode == 2:
+#             # Deeper nodes get more cells (Evolved Dominance)
+#             # Original logic
+#             weight = 1.0 + node.depth * gamma
+#         else:
+#             raise ValueError("Mode must be 0, 1, or 2")
+            
+#         weights.append(weight)
+    
+#     total_weight = sum(weights)
+    
+#     # Distribute cells based on weights
+#     remaining_cells = cell_num
+#     for i, node in enumerate(all_nodes):
+#         # Calculate cell allocation proportionally
+#         if total_weight > 0:
+#             node_cells = int((weights[i] / total_weight) * cell_num)
+#         else:
+#             node_cells = 0 # Should not happen unless weights are 0
+            
+#         node.cell_no = node_cells
+#         remaining_cells -= node_cells
+    
+#     # Distribute any remaining cells due to rounding
+#     # (Simple round-robin to the first few nodes)
+#     for i in range(remaining_cells):
+#         all_nodes[i % len(all_nodes)].cell_no += 1
+    
+#     return root
+
+
+def assign_cells_to_all_nodes(root, cell_num, mode=0, jitter=0.15, seed=None):
     """
     Assign cells to all nodes of the tree based on the selected distribution mode.
-    
+
     Parameters:
     - root: Root node of the tree
     - cell_num: Total number of cells to distribute
@@ -468,59 +535,71 @@ def assign_cells_to_all_nodes(root, cell_num, mode=0):
         0: Uniform distribution (all nodes get roughly equal cells)
         1: Depth-decreasing (deeper nodes get fewer cells - ancestral dominance)
         2: Depth-increasing (deeper nodes get more cells - evolved dominance)
-    
+    - jitter: Relative magnitude of random perturbation (float, e.g. 0.15 = ±15%)
+    - seed: Optional random seed for reproducibility
+
     Returns:
     - Updated tree with cell_no assigned to all nodes
     """
+    rng = random.Random(seed)
+
     # Collect all nodes in the tree iteratively
     all_nodes = []
     queue = [root]
-    
+
     while queue:
         node = queue.pop(0)
         all_nodes.append(node)
         queue.extend(node.children)
-    
+
     # Calculate weights based on the selected mode
     weights = []
-    gamma = 0.5 # Scaling factor
-    
+    gamma = 0.5  # Scaling factor
+
     for node in all_nodes:
         if mode == 0:
             # Uniform distribution
-            weight = 1.0
+            base_weight = 1.0
         elif mode == 1:
             # Deeper nodes get fewer cells (Ancestral Dominance)
-            # Using inverse relationship
-            weight = 1.0 / (1.0 + node.depth * gamma)
+            base_weight = 1.0 / (1.0 + node.depth * gamma)
         elif mode == 2:
             # Deeper nodes get more cells (Evolved Dominance)
-            # Original logic
-            weight = 1.0 + node.depth * gamma
+            base_weight = 1.0 + node.depth * gamma
         else:
             raise ValueError("Mode must be 0, 1, or 2")
-            
-        weights.append(weight)
-    
+
+        # Apply a small multiplicative perturbation so that nodes with the
+        # same base weight (uniform mode, or same-depth clones) still differ
+        # slightly, while preserving the overall depth-based trend.
+        # Factor is drawn uniformly from [1 - jitter, 1 + jitter].
+        perturbation = 1.0 + rng.uniform(-jitter, jitter)
+        weight = base_weight * perturbation
+
+        # Guard against non-positive weights when jitter is large
+        weights.append(max(weight, 1e-9))
+
     total_weight = sum(weights)
-    
+
     # Distribute cells based on weights
     remaining_cells = cell_num
     for i, node in enumerate(all_nodes):
-        # Calculate cell allocation proportionally
         if total_weight > 0:
             node_cells = int((weights[i] / total_weight) * cell_num)
         else:
-            node_cells = 0 # Should not happen unless weights are 0
-            
+            node_cells = 0  # Should not happen unless weights are 0
+
         node.cell_no = node_cells
         remaining_cells -= node_cells
-    
-    # Distribute any remaining cells due to rounding
-    # (Simple round-robin to the first few nodes)
-    for i in range(remaining_cells):
-        all_nodes[i % len(all_nodes)].cell_no += 1
-    
+
+    # Distribute any remaining cells due to rounding.
+    # Shuffle node order so the leftover cells are not always given to the
+    # same first few nodes (which would bias the distribution).
+    order = list(range(len(all_nodes)))
+    rng.shuffle(order)
+    for k in range(remaining_cells):
+        all_nodes[order[k % len(all_nodes)]].cell_no += 1
+
     return root
 
 def generate_tree_beta(cell_num=1000, num_clones=10, alpha=10.0, beta=10.0, 
