@@ -3,9 +3,9 @@
 [![Downloads](https://static.pepy.tech/badge/hcdsim)](https://pepy.tech/project/hcdsim)
 [![Docs](https://readthedocs.org/projects/hcdsim/badge/)](https://hcdsim.readthedocs.io)
 
-# HCDSIM: A Single-Cell Genomics Simulator with Haplotype-Specific Copy Number Annotation.
+# HCDSIM: A Single-Cell Genomics Simulator with Haplotype- and Clone-Specific Copy Number Annotation.
 
-HCDSIM: A Single-Cell Genomics Simulator with Haplotype-Specific Copy Number Annotation. Read the full [documentation] here.
+HCDSIM: A Single-Cell Genomics Simulator with Haplotype- and Clone-Specific Copy Number Annotation. Read the full [documentation] here.
 
 ![HCDSIM Workflow](docs/images/HCDSIM_Figure1.png)
 
