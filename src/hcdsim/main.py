@@ -1051,7 +1051,7 @@ class HCDSIM:
                                 if ref['Chromosome'][idx] != start_chrom:
                                     break
 
-                                if clone.cna_status[idx] == 'post-wgd-dup':
+                                if isinstance(clone.cna_status[idx], tuple) and clone.cna_status[idx][0] == 'post-wgd-dup':
                                     can_place = False
                                     break
                                 
@@ -1477,8 +1477,11 @@ class HCDSIM:
                 # Find available indices where clone has no CNA (copy number = 1 for both alleles)
                 if is_wgd:
                     available_indices = [
-                        idx for idx in range(total_bin_lens) 
-                        if clone.cna_status[idx] != 'post-wgd-dup'
+                        idx for idx in range(total_bin_lens)
+                        if not (
+                            isinstance(clone.cna_status[idx], tuple)
+                            and clone.cna_status[idx][0] == 'post-wgd-dup'
+                        )
                     ]
                 else:
                     available_indices = [
@@ -1531,9 +1534,14 @@ class HCDSIM:
                             if ref['Chromosome'][potential_idx] != start_chrom:
                                 break
 
+                            if cell_cna_status[potential_idx] is not None:
+                                can_place = False
+                                break
+                            
                             # Check if this position is available (unmutated in clone and not yet assigned)
                             if is_wgd:
-                                if clone.cna_status[potential_idx] == 'post-wgd-dup':
+                                status = clone.cna_status[potential_idx]
+                                if isinstance(status, tuple) and status[0] == 'post-wgd-dup':
                                     can_place = False
                                     break
                             else:
@@ -2498,7 +2506,7 @@ class HCDSIM:
             newwick_str = ''
             with open(self.tree_newwick, 'r') as f:
                 newick_string = f.read()
-            root = random_tree.load_tree_from_newick(newick_string, mode=self.tree_mode, jitter=self.jitter)
+            root = random_tree.load_tree_from_newick(newick_string, cell_num=self.cell_no, mode=self.tree_mode, jitter=self.jitter)
         else:
             self.log('Generating random cell-lineage tree...', level='PROGRESS')
             root = random_tree.generate_tree_beta(cell_num=self.cell_no, num_clones=self.clone_no-1, alpha=self.tree_alpha, beta=self.tree_beta, treedepth=self.max_tree_depth, treedepthsigma=self.tree_depth_sigma, max_children=self.max_node_children, balance_factor=self.tree_balance_factor, mode=self.tree_mode, seed=self.random_seed, jitter=self.jitter)
