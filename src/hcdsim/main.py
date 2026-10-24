@@ -1377,15 +1377,15 @@ class HCDSIM:
                                     p_event_type = 'CNN_LOH'
                                 else:
                                     p_event_type = 'CNG_LOH'
-                                if m_cna != 1:
+                                if m_cna != parent_m_cna:
                                     clone.changes.append([
-                                        'normal', clone.name, 'maternal', p_event_type,
+                                        parent.name, clone.name, 'maternal', p_event_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_m_cna}->{m_cna}'
                                     ])
-                                if p_cna != 1:
+                                if p_cna != parent_p_cna:
                                     clone.changes.append([
-                                        'normal', clone.name, 'paternal', p_event_type,
+                                        parent.name, clone.name, 'paternal', p_event_type,
                                         f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
                                         f'{parent_p_cna}->{p_cna}'
                                     ])
