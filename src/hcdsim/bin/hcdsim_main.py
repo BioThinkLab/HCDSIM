@@ -168,8 +168,6 @@ def add_gprofile_arguments(parser):
     parser.add_argument('--chrom_arm_rate', type=float, required=False, default=0.75, metavar="", help='Rate of arm-level vs whole-chromosome CNAs (default: 0.75)')
     # HCDSIM param: loh_cna_no
     parser.add_argument('-loh', '--loh_cna_no', type=int, required=False, default=15, metavar="", help='Number of LOH CNAs per clone (default: 15)')
-    # HCDSIM param: goh_cna_no
-    parser.add_argument('-goh', '--goh_cna_no', type=int, required=False, default=5, metavar="", help='Number of GOH CNAs per clone (default: 5)')
     # HCDSIM param: unique_ratio
     parser.add_argument('--unique_ratio', type=float, required=False, default=0.5, metavar="", help='Ratio of cells with unique mutations per clone (default: 0.5)')
 

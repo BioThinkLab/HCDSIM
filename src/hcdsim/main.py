@@ -83,7 +83,6 @@ class HCDSIM:
                 chrom_cna_no: int = 2,
                 chrom_arm_rate: float = 0.75,
                 loh_cna_no: int = 15, 
-                goh_cna_no: int = 5, 
                 unique_ratio: float = 0.5,
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
@@ -297,8 +296,6 @@ class HCDSIM:
         utils.check_between(0,1,error_rate=self.error_rate)
         utils.check_int(loh_cna_no=self.loh_cna_no)
         utils.check_lt_zero(loh_cna_no=self.loh_cna_no)
-        utils.check_int(goh_cna_no=self.goh_cna_no)
-        utils.check_lt_zero(goh_cna_no=self.goh_cna_no)
         utils.check_int(barcode_len=self.barcode_len)
         utils.check_positive(barcode_len=self.barcode_len)
         self._validate_profile_params()
@@ -528,7 +525,7 @@ class HCDSIM:
 
     def _validate_profile_params(self):
         """Validate the parameters used by clone/cell profile generation."""
-        for name in ("max_cna_value", "chrom_cna_no", "loh_cna_no", "goh_cna_no"):
+        for name in ("max_cna_value", "chrom_cna_no", "loh_cna_no"):
             value = getattr(self, name)
             if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
                 raise ValueError(f"{name} must be an integer, got {value!r}")
@@ -557,13 +554,14 @@ class HCDSIM:
                 if copies < 2 or 2 * copies > self.max_cna_value:
                     raise ValueError("Initial WGD copy numbers are incompatible with max_cna_value")
 
-    def _place_profile_loh_goh(self, clone, ref, maternal_genome, paternal_genome,
+    def _place_profile_loh(self, clone, ref, maternal_genome, paternal_genome,
                                cna_event_id, heterozygous_bins=None, parent=None):
         """Reserve only sequence-eligible events; return next ID and a reusable bin cache."""
         cnl_no = self.loh_cna_no // 3
-        event_types = (["cnl"] * cnl_no
-                       + ["cnn"] * (self.loh_cna_no - cnl_no)
-                       + ["goh"] * self.goh_cna_no)
+        event_types = (
+            ["cnl"] * cnl_no
+            + ["cnn"] * (self.loh_cna_no - cnl_no)
+        )
         if not event_types:
             return cna_event_id, heterozygous_bins
 
@@ -574,7 +572,7 @@ class HCDSIM:
         free_indices = [i for i in range(total_bins)
                         if clone.cna_status[i] is None
                         and (parent is None or parent.cna_status[i] is None)]
-        placed = dict.fromkeys(("cnl", "cnn", "goh"), 0)
+        placed = dict.fromkeys(("cnl", "cnn"), 0)
 
         if free_indices and heterozygous_bins is None:
             heterozygous_bins = np.array([
@@ -588,10 +586,6 @@ class HCDSIM:
             available = [i for i in free_indices if clone.cna_status[i] is None]
             if not available:
                 break
-            if event_type == "goh":
-                available = [i for i in available if not heterozygous_bins[i]]
-            elif not np.any(heterozygous_bins[available]):
-                continue
             random.shuffle(available)
 
             for start_idx in available:
@@ -609,10 +603,6 @@ class HCDSIM:
 
                 if not can_place or not span:
                     continue
-                has_heterozygosity = bool(np.any(heterozygous_bins[span]))
-                if (event_type == "goh" and has_heterozygosity
-                        or event_type != "goh" and not has_heterozygosity):
-                    continue
 
                 for idx in span:
                     clone.cna_status[idx] = (event_type, len(span), cna_event_id)
@@ -623,7 +613,7 @@ class HCDSIM:
         if sum(placed.values()) < len(event_types):
             counts = ", ".join(f"{name}: {placed[name]}/{event_types.count(name)}"
                                for name in placed)
-            self.log(f"{clone.name}: LOH/GOH placed/requested: {counts}; "
+            self.log(f"{clone.name}: LOH placed/requested: {counts}; "
                      "some events had no eligible free span", level="WARN")
         return cna_event_id, heterozygous_bins
 
@@ -676,7 +666,7 @@ class HCDSIM:
             clone.maternal_cnas = []
             clone.paternal_cnas = []
             clone.changes = []
-            clone.cna_status = [None] * total_bin_lens  # None, 'cnl', 'cnn', 'goh', 'mirror'
+            clone.cna_status = [None] * total_bin_lens  # None, 'cnl', 'cnn', 'mirror'
 
             if clone.depth == 1: # children of normal clone
                 # if include wgd, set one clone to wgd
@@ -742,7 +732,7 @@ class HCDSIM:
                             clone.cna_status[i] = ('whole-chrom-cna', len(chrom_indices), cna_event_id)
                         cna_event_id += 1
                                     
-                cna_event_id, heterozygous_bins = self._place_profile_loh_goh(
+                cna_event_id, heterozygous_bins = self._place_profile_loh(
                     clone, ref, maternal_genome, paternal_genome,
                     cna_event_id, heterozygous_bins=heterozygous_bins
                 )
@@ -896,29 +886,29 @@ class HCDSIM:
                             ])
                     
                     # Handle GOH (Gain of Heterozygosity)
-                    elif cna_type == "goh":
-                        if m_sequence == p_sequence:
-                            # GOH: Both alleles gain, but with different copy numbers
-                            m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - 1)
-                            if m_cna == 1:
-                                p_cna = min(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value - m_cna)
-                            else:
-                                p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - m_cna)
+                    # elif cna_type == "goh":
+                    #     if m_sequence == p_sequence:
+                    #         # GOH: Both alleles gain, but with different copy numbers
+                    #         m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - 1)
+                    #         if m_cna == 1:
+                    #             p_cna = min(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value - m_cna)
+                    #         else:
+                    #             p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - m_cna)
                             
-                            for bin_idx in event_bins:
-                                clone.maternal_cnas[bin_idx] = m_cna
-                                clone.paternal_cnas[bin_idx] = p_cna
+                    #         for bin_idx in event_bins:
+                    #             clone.maternal_cnas[bin_idx] = m_cna
+                    #             clone.paternal_cnas[bin_idx] = p_cna
                             
-                            clone.changes.append([
-                                'normal', clone.name, 'maternal', 'GOH',
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
-                                f'1->{m_cna}'
-                            ])
-                            clone.changes.append([
-                                'normal', clone.name, 'paternal', 'GOH',
-                                f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
-                                f'1->{p_cna}'
-                            ])
+                    #         clone.changes.append([
+                    #             'normal', clone.name, 'maternal', 'GOH',
+                    #             f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                    #             f'1->{m_cna}'
+                    #         ])
+                    #         clone.changes.append([
+                    #             'normal', clone.name, 'paternal', 'GOH',
+                    #             f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                    #             f'1->{p_cna}'
+                    #         ])
                             
                     # Handle chromosome arm-level CNA
                     elif cna_type == "chrom-arm-cna":
@@ -1168,7 +1158,7 @@ class HCDSIM:
                                 cna_event_id += 1
                 
                 else:  # Parent is not WGD, allow all types of mutations on non-mutated regions
-                    cna_event_id, heterozygous_bins = self._place_profile_loh_goh(
+                    cna_event_id, heterozygous_bins = self._place_profile_loh(
                         clone, ref, maternal_genome, paternal_genome,
                         cna_event_id, heterozygous_bins=heterozygous_bins,
                         parent=parent
@@ -1328,32 +1318,32 @@ class HCDSIM:
                                 ])
                         
                         # Handle GOH
-                        elif cna_type == "goh":
-                            if m_sequence == p_sequence:
-                                # GOH: Both alleles gain, but with different copy numbers
-                                m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - 1)
-                                if m_cna == 1:
-                                    p_cna = min(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value - m_cna)
-                                else:
-                                    p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - m_cna)
+                        # elif cna_type == "goh":
+                        #     if m_sequence == p_sequence:
+                        #         # GOH: Both alleles gain, but with different copy numbers
+                        #         m_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - 1)
+                        #         if m_cna == 1:
+                        #             p_cna = min(np.random.geometric(self.cna_copy_param), 2, self.max_cna_value - m_cna)
+                        #         else:
+                        #             p_cna = min(np.random.geometric(self.cna_copy_param), self.max_cna_value - m_cna)
                                 
-                                for bin_idx in event_bins:
-                                    clone.maternal_cnas[bin_idx] = m_cna
-                                    clone.paternal_cnas[bin_idx] = p_cna
+                        #         for bin_idx in event_bins:
+                        #             clone.maternal_cnas[bin_idx] = m_cna
+                        #             clone.paternal_cnas[bin_idx] = p_cna
                                 
-                                if m_cna != parent_m_cna:
-                                    clone.changes.append([
-                                        parent.name, clone.name, 'maternal', 'GOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
-                                        f'{parent_m_cna}->{m_cna}'
-                                    ])
+                        #         if m_cna != parent_m_cna:
+                        #             clone.changes.append([
+                        #                 parent.name, clone.name, 'maternal', 'GOH',
+                        #                 f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                        #                 f'{parent_m_cna}->{m_cna}'
+                        #             ])
                                 
-                                if p_cna != parent_p_cna:
-                                    clone.changes.append([
-                                        parent.name, clone.name, 'paternal', 'GOH',
-                                        f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
-                                        f'{parent_p_cna}->{p_cna}'
-                                    ])
+                        #         if p_cna != parent_p_cna:
+                        #             clone.changes.append([
+                        #                 parent.name, clone.name, 'paternal', 'GOH',
+                        #                 f"{event_chrom}:{event_start_pos}-{event_end_pos}",str(event_end_pos-event_start_pos + 1),
+                        #                 f'{parent_p_cna}->{p_cna}'
+                        #             ])
                         
                         # Handle regular CNA
                         elif cna_type == "cna":
@@ -1745,25 +1735,25 @@ class HCDSIM:
                         #         new_p_cna = p_cna - new_m_cna
                         #         cna_m_sequence = p_sequence * new_m_cna
                         #         cna_p_sequence = p_sequence * new_p_cna
-                        if cna_type == 'GOH':
-                            seq_len = len(m_sequence)
-                            random_snp_no = min(1, int(self.bin_size * self.snp_ratio))
-                            random_snps = {snp : random.sample(['A','T','C','G'], 2) for snp in random.sample(range(seq_len), random_snp_no)}
-                            new_m_sequence = ''
-                            new_p_sequence = ''
-                            snp_pos = random_snps.keys()
-                            for pos in range(len(m_sequence)):
-                                if pos in snp_pos:
-                                    new_m_sequence += random_snps[pos][0]
-                                    new_p_sequence += random_snps[pos][1]
-                                else:
-                                    new_m_sequence += m_sequence[pos]
-                                    new_p_sequence += p_sequence[pos]
-                            cna_m_sequence = new_m_sequence * m_cna
-                            cna_p_sequence = new_p_sequence * p_cna
-                        else:   
-                            cna_m_sequence = m_sequence * m_cna
-                            cna_p_sequence = p_sequence * p_cna
+                        # if cna_type == 'GOH':
+                        #     seq_len = len(m_sequence)
+                        #     random_snp_no = min(1, int(self.bin_size * self.snp_ratio))
+                        #     random_snps = {snp : random.sample(['A','T','C','G'], 2) for snp in random.sample(range(seq_len), random_snp_no)}
+                        #     new_m_sequence = ''
+                        #     new_p_sequence = ''
+                        #     snp_pos = random_snps.keys()
+                        #     for pos in range(len(m_sequence)):
+                        #         if pos in snp_pos:
+                        #             new_m_sequence += random_snps[pos][0]
+                        #             new_p_sequence += random_snps[pos][1]
+                        #         else:
+                        #             new_m_sequence += m_sequence[pos]
+                        #             new_p_sequence += p_sequence[pos]
+                        #     cna_m_sequence = new_m_sequence * m_cna
+                        #     cna_p_sequence = new_p_sequence * p_cna
+                        # else:   
+                        cna_m_sequence = m_sequence * m_cna
+                        cna_p_sequence = p_sequence * p_cna
                         m_output.write(cna_m_sequence)
                         p_output.write(cna_p_sequence)
                         clone.maternal_fasta_length += len(cna_m_sequence)

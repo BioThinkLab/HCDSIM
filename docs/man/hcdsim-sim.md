@@ -5,7 +5,7 @@
 ```shell
 usage: hcdsim sim [-h] [-r] [-o] [-g] [-b] [-gv] [-cno] [-eno] [-t] [--random_seed] [--tree_alpha] [--tree_beta] [-d] [--tree_depth_sigma]
                   [--max_node_children] [--tree_balance_factor] [--tree_newwick] [--tree_mode] [-l] [-p] [-hr] [-cp] [--del_prob] [--cna_copy_param]
-                  [--max_cna_value] [--max_ploidy] [--weights] [--lambdas] [-wgd] [--chrom_cna_no] [--chrom_arm_rate] [-loh] [-goh] [--unique_ratio]
+                  [--max_cna_value] [--max_ploidy] [--weights] [--lambdas] [-wgd] [--chrom_cna_no] [--chrom_arm_rate] [-loh] [--unique_ratio]
                   [-c] [-rl] [-i] [-e] [--lorenz_x] [--lorenz_y] [--window_size] [--correlation_len] [-cc] [-bcl] [--wgsim] [--bwa] [--samtools]
                   [--bedtools] [--bcftools]
 
@@ -45,7 +45,6 @@ options:
   --chrom_cna_no        Number of chromosomes to have chromosome-level CNAs (default: 2)
   --chrom_arm_rate      Rate of arm-level vs whole-chromosome CNAs (default: 0.75)
   -loh , --loh_cna_no   Number of LOH CNAs per clone (default: 15)
-  -goh , --goh_cna_no   Number of GOH CNAs per clone (default: 5)
   --unique_ratio        Ratio of cells with unique mutations per clone (default: 0.5)
   -c , --clone_coverage 
                         The reads coverage for clone (default: 30)
