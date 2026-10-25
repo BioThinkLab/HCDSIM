@@ -131,7 +131,7 @@ def parseSNPList(snpfile):
         for line in input:
             info = line.strip().split('\t')
             chrom = info[0]
-            pos = info[1]
+            pos = int(info[1])
             allele1 = info[2].upper()
             allele2 = info[3].upper()
             if allele1 not in ['A', 'C', 'G', 'T'] or allele2 not in ['A', 'C', 'G', 'T']:

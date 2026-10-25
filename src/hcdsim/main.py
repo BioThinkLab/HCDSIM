@@ -301,7 +301,8 @@ class HCDSIM:
         utils.check_lt_zero(goh_cna_no=self.goh_cna_no)
         utils.check_int(barcode_len=self.barcode_len)
         utils.check_positive(barcode_len=self.barcode_len)
-
+        self._validate_profile_params()
+        
     def get_params(self):
         print(vars(self))
 
@@ -522,9 +523,117 @@ class HCDSIM:
         
         return pd.DataFrame(bins)
 
+# Copy these four methods into class HCDSIM, replacing the two existing profile methods.
+# The original file already imports numpy as np and the other required dependencies.
+
+    def _validate_profile_params(self):
+        """Validate the parameters used by clone/cell profile generation."""
+        for name in ("max_cna_value", "chrom_cna_no", "loh_cna_no", "goh_cna_no"):
+            value = getattr(self, name)
+            if isinstance(value, (bool, np.bool_)) or not isinstance(value, (int, np.integer)):
+                raise ValueError(f"{name} must be an integer, got {value!r}")
+            if value < (2 if name == "max_cna_value" else 0):
+                raise ValueError(f"Invalid {name}: {value}")
+
+        for name in ("unique_ratio", "del_prob", "cna_prob", "chrom_arm_rate", "cna_copy_param"):
+            value = getattr(self, name)
+            if (not isinstance(value, (int, float, np.integer, np.floating))
+                    or not np.isfinite(value) or not 0 <= value <= 1):
+                raise ValueError(f"{name} must be finite and within [0, 1]")
+        if self.cna_copy_param == 0:
+            raise ValueError("cna_copy_param must be greater than 0")
+
+        if self.max_ploidy is not None:
+            if (isinstance(self.max_ploidy, (bool, np.bool_))
+                    or not isinstance(self.max_ploidy, (int, np.integer))
+                    or self.max_ploidy <= 0):
+                raise ValueError("max_ploidy must be a positive integer or None")
+
+        if self.wgd:
+            if self.max_cna_value < 4:
+                raise ValueError("WGD requires max_cna_value >= 4")
+            if self.max_ploidy is not None:
+                copies = self.max_ploidy // 2
+                if copies < 2 or 2 * copies > self.max_cna_value:
+                    raise ValueError("Initial WGD copy numbers are incompatible with max_cna_value")
+
+    def _place_profile_loh_goh(self, clone, ref, maternal_genome, paternal_genome,
+                               cna_event_id, heterozygous_bins=None, parent=None):
+        """Reserve only sequence-eligible events; return next ID and a reusable bin cache."""
+        cnl_no = self.loh_cna_no // 3
+        event_types = (["cnl"] * cnl_no
+                       + ["cnn"] * (self.loh_cna_no - cnl_no)
+                       + ["goh"] * self.goh_cna_no)
+        if not event_types:
+            return cna_event_id, heterozygous_bins
+
+        total_bins = len(ref)
+        chroms = ref["Chromosome"].tolist()
+        starts = ref["Start"].tolist()
+        ends = ref["End"].tolist()
+        free_indices = [i for i in range(total_bins)
+                        if clone.cna_status[i] is None
+                        and (parent is None or parent.cna_status[i] is None)]
+        placed = dict.fromkeys(("cnl", "cnn", "goh"), 0)
+
+        if free_indices and heterozygous_bins is None:
+            heterozygous_bins = np.array([
+                maternal_genome[chroms[i]][starts[i] - 1:ends[i]]
+                != paternal_genome[chroms[i]][starts[i] - 1:ends[i]]
+                for i in range(total_bins)
+            ], dtype=bool)
+
+        random.shuffle(event_types)
+        for event_type in event_types:
+            available = [i for i in free_indices if clone.cna_status[i] is None]
+            if not available:
+                break
+            if event_type == "goh":
+                available = [i for i in available if not heterozygous_bins[i]]
+            elif not np.any(heterozygous_bins[available]):
+                continue
+            random.shuffle(available)
+
+            for start_idx in available:
+                span_len = int(utils.generate_mixture_poisson(self.weights, self.lambdas))
+                span = []
+                can_place = True
+                for idx in range(start_idx, min(start_idx + span_len, total_bins)):
+                    if chroms[idx] != chroms[start_idx]:
+                        break
+                    if (clone.cna_status[idx] is not None
+                            or (parent is not None and parent.cna_status[idx] is not None)):
+                        can_place = False
+                        break
+                    span.append(idx)
+
+                if not can_place or not span:
+                    continue
+                has_heterozygosity = bool(np.any(heterozygous_bins[span]))
+                if (event_type == "goh" and has_heterozygosity
+                        or event_type != "goh" and not has_heterozygosity):
+                    continue
+
+                for idx in span:
+                    clone.cna_status[idx] = (event_type, len(span), cna_event_id)
+                cna_event_id += 1
+                placed[event_type] += 1
+                break
+
+        if sum(placed.values()) < len(event_types):
+            counts = ", ".join(f"{name}: {placed[name]}/{event_types.count(name)}"
+                               for name in placed)
+            self.log(f"{clone.name}: LOH/GOH placed/requested: {counts}; "
+                     "some events had no eligible free span", level="WARN")
+        return cna_event_id, heterozygous_bins
+
     def _generate_cna_profile_for_each_clone(self, root, ref, m_fasta, p_fasta):
         
+        self._validate_profile_params()
+        heterozygous_bins = None
         all_chroms = ref['Chromosome'].unique().tolist()
+        if self.chrom_cna_no > len(all_chroms):
+            raise ValueError("chrom_cna_no exceeds the number of reference chromosomes")
 
         # store maternal and paternal genome to dict
         maternal_genome = {}
@@ -633,69 +742,10 @@ class HCDSIM:
                             clone.cna_status[i] = ('whole-chrom-cna', len(chrom_indices), cna_event_id)
                         cna_event_id += 1
                                     
-                # select the position for CNL_LOH, CNN_LOH, GOH and Mirror CNA
-                available_indices = [i for i in range(total_bin_lens) if clone.cna_status[i] is None]
-
-                if len(available_indices) == 0:
-                    raise Exception("No available bins for LOH and GOH CNAs after assigning WGD and WCL CNAs. Please decrease the number of WGD and WCL CNAs.")
-
-                cnl_loh_no = int(self.loh_cna_no/3)
-
-                cna_types_to_generate = (
-                    ["cnl"] * cnl_loh_no + 
-                    ["cnn"] * (self.loh_cna_no - cnl_loh_no) + 
-                    ["goh"] * self.goh_cna_no
+                cna_event_id, heterozygous_bins = self._place_profile_loh_goh(
+                    clone, ref, maternal_genome, paternal_genome,
+                    cna_event_id, heterozygous_bins=heterozygous_bins
                 )
-
-                random.shuffle(available_indices)
-                random.shuffle(cna_types_to_generate)
-
-                cna_generated = 0
-                total_cnas = len(cna_types_to_generate)
-
-                for start_idx in available_indices:
-                    if cna_generated >= total_cnas:
-                        break
-                    
-                    if clone.cna_status[start_idx] is not None:
-                        continue
-                    
-                    num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
-                    
-                    # Get chromosome of the start position
-                    start_chrom = ref['Chromosome'][start_idx]
-                    
-                    # Check if CNA can be placed without crossing chromosome boundary
-                    can_place = True
-                    span_indices = []
-                    
-                    for j in range(num_windows_span):
-                        idx = start_idx + j
-                        
-                        # Check if we've exceeded total bins
-                        if idx >= total_bin_lens:
-                            break
-                        
-                        # Check if we've crossed chromosome boundary
-                        if ref['Chromosome'][idx] != start_chrom:
-                           break
-                        
-                        # Check if position is already occupied
-                        if clone.cna_status[idx] is not None:
-                            can_place = False
-                            break
-                        
-                        span_indices.append(idx)
-                    
-                    if can_place and len(span_indices) > 0:
-                        cna_type = cna_types_to_generate[cna_generated]
-                        
-                        # Mark all positions in the span
-                        for idx in span_indices:
-                            clone.cna_status[idx] = (cna_type, len(span_indices), cna_event_id)
-                        
-                        cna_event_id += 1 
-                        cna_generated += 1
 
                 # generate usual cna according to probability cutoff
                 i = 0
@@ -1022,7 +1072,12 @@ class HCDSIM:
                     clone.paternal_cnas.append(parent.paternal_cnas[i])
                
                 # Check if parent is WGD
-                parent_is_wgd = any('wgd' in status for status in parent.cna_status if status is not None)
+                parent_is_wgd = any(
+                    (status[0] if isinstance(status, tuple) else status)
+                    in ('wgd', 'post-wgd-dup')
+                    for status in parent.cna_status
+                    if status is not None
+                )
                 
                 cna_event_id = max([status[2] for status in parent.cna_status if isinstance(status, tuple)], default=0) + 1
                 
@@ -1051,6 +1106,11 @@ class HCDSIM:
                                 if ref['Chromosome'][idx] != start_chrom:
                                     break
 
+                                # Check if position has already been modified or was modified in parent
+                                if clone.cna_status[idx] != parent.cna_status[idx]:
+                                    can_place = False
+                                    break
+                                    
                                 if isinstance(clone.cna_status[idx], tuple) and clone.cna_status[idx][0] == 'post-wgd-dup':
                                     can_place = False
                                     break
@@ -1108,69 +1168,17 @@ class HCDSIM:
                                 cna_event_id += 1
                 
                 else:  # Parent is not WGD, allow all types of mutations on non-mutated regions
-                    # Find available indices (where parent has no CNA)
-                    available_indices = [i for i in range(total_bin_lens) if parent.cna_status[i] is None]
-                    
-                    if len(available_indices) > 0:
-                        # Select LOH and GOH CNAs
-                        cnl_loh_no = int(self.loh_cna_no / 3)
-                        
-                        cna_types_to_generate = (
-                            ["cnl"] * cnl_loh_no + 
-                            ["cnn"] * (self.loh_cna_no - cnl_loh_no) + 
-                            ["goh"] * self.goh_cna_no
-                        )
-                        
-                        random.shuffle(available_indices)
-                        random.shuffle(cna_types_to_generate)
-                        
-                        cna_generated = 0
-                        total_cnas = len(cna_types_to_generate)
-                        
-                        for start_idx in available_indices:
-                            if cna_generated >= total_cnas:
-                                break
-                            
-                            if clone.cna_status[start_idx] != parent.cna_status[start_idx] or parent.cna_status[start_idx] is not None:
-                                continue
-                            
-                            num_windows_span = utils.generate_mixture_poisson(self.weights, self.lambdas)
-                            
-                            # Get chromosome of the start position
-                            start_chrom = ref['Chromosome'][start_idx]
-                            
-                            # Find valid span that doesn't cross chromosome boundary
-                            can_place = True
-                            span_indices = []
-                            
-                            for j in range(num_windows_span):
-                                idx = start_idx + j
-                                
-                                # Check if we've exceeded total bins
-                                if idx >= total_bin_lens:
-                                    break
-                                
-                                # Check if we've crossed chromosome boundary
-                                if ref['Chromosome'][idx] != start_chrom:
-                                    break
-                                
-                                # Check if position has already been modified or was modified in parent
-                                if clone.cna_status[idx] != parent.cna_status[idx] or parent.cna_status[idx] is not None:
-                                    can_place = False
-                                    break
-                                
-                                span_indices.append(idx)
-                            
-                            if can_place and len(span_indices) > 0:
-                                cna_type = cna_types_to_generate[cna_generated]
-                                for idx in span_indices:
-                                    clone.cna_status[idx] = (cna_type, len(span_indices), cna_event_id)
-                                cna_event_id += 1
-                                cna_generated += 1
-                        
+                    cna_event_id, heterozygous_bins = self._place_profile_loh_goh(
+                        clone, ref, maternal_genome, paternal_genome,
+                        cna_event_id, heterozygous_bins=heterozygous_bins,
+                        parent=parent
+                    )
+                    available_indices = [
+                        i for i in range(total_bin_lens)
+                        if clone.cna_status[i] is None and parent.cna_status[i] is None
+                    ]
+                    if available_indices:
                         # Generate regular CNAs on remaining available positions
-                        available_indices = [i for i in range(total_bin_lens) if clone.cna_status[i] == parent.cna_status[i] and parent.cna_status[i] is None]
-                        
                         i = 0
                         while i < total_bin_lens:
                             if clone.cna_status[i] == parent.cna_status[i] and parent.cna_status[i] is None:
@@ -1432,6 +1440,7 @@ class HCDSIM:
             dict: Dictionary mapping cell IDs to their CNA profiles and changes
         """
         
+        self._validate_profile_params()
         total_bin_lens = ref.shape[0]
         cell_profiles = {}
         
@@ -1460,7 +1469,12 @@ class HCDSIM:
                 }
                 
             if clone.cna_status is not None:
-                is_wgd = any('wgd' in status for status in clone.cna_status if status is not None)
+                is_wgd = any(
+                    (status[0] if isinstance(status, tuple) else status)
+                    in ('wgd', 'post-wgd-dup')
+                    for status in clone.cna_status
+                    if status is not None
+                )
             else:
                 is_wgd = False
 
