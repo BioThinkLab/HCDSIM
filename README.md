@@ -120,7 +120,7 @@ Software and data archives:
   title     = {hcCNA-bench and hcCNA-bench-tree: Benchmark datasets for evaluating haplotype- and clone-specific detection of complex copy number alterations in single-cell DNA sequencing},
   year      = {2026},
   publisher = {Zenodo},
-  doi       = {10.5281/zenodo.21167430}
+  doi       = {10.5281/zenodo.21167429}
 }
 ```
 
