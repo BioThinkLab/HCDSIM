@@ -78,7 +78,7 @@ Both evaluation modules cover five perspectives (20 evaluation questions):
 | **hcCNA-bench** | 10 clones (1 normal + 9 tumor), 1,000 cells, evolved dominance, coverages 0.01x / 0.02x / 0.05x / 0.1x / 0.2x |
 | **hcCNA-bench-tree** | 5 datasets at 0.02x, 1,000 cells: 10-clone and 6-clone trees under uniform, ancestral, and evolved dominance modes |
 
-All simulated datasets, including GT haplotype- and clone-specific CN profiles and single-cell reads, are available on Zenodo: [10.5281/zenodo.21167430](https://doi.org/10.5281/zenodo.21167430).
+All simulated datasets, including GT haplotype- and clone-specific CN profiles and single-cell reads, are available on Zenodo: [10.5281/zenodo.21167429](https://doi.org/10.5281/zenodo.21167429).
 
 ## Citation
 
