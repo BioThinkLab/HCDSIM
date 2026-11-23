@@ -82,17 +82,22 @@ All simulated datasets, including GT haplotype- and clone-specific CN profiles a
 
 ## Citation
 
-> 📝 The manuscript is currently under review. This section will be updated once it is published.
+📝 **Our paper has been published in Genome Biology!**
 
-If you use HCDSIM, HCBench, or the hcCNA-bench datasets, please cite:
+If you use **HCDSIM**, **HCBench**, or the **hcCNA-bench datasets** in your research, please cite our paper:
+
+Feng, X., Jiang, A., Peng, S. *et al.* Benchmarking of haplotype- and clone-specific detection callers of complex copy number alterations in single-cell DNA sequencing with HCDSIM and HCBench. *Genome Biology* (2026). https://doi.org/10.1186/s13059-026-04358-7
+
+**BibTeX:**
 
 ```bibtex
 @article{feng2026hcdsim,
-  title   = {Benchmarking of haplotype- and clone-specific detection callers of complex copy number alterations in single-cell DNA-sequencing with HCDSIM and HCBench},
+  title   = {Benchmarking of haplotype- and clone-specific detection callers of complex copy number alterations in single-cell DNA sequencing with HCDSIM and HCBench},
   author  = {Feng, Xikang and Jiang, Anna and Peng, Sisi and Jin, Qiangguo and He, Liang and Chen, Lingxi},
-  journal = {TBD},
+  journal = {Genome Biology},
   year    = {2026},
-  doi     = {TBD}
+  doi     = {10.1186/s13059-026-04358-7},
+  url     = {https://doi.org/10.1186/s13059-026-04358-7}
 }
 ```
 
