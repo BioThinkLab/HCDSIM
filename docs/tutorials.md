@@ -19,7 +19,15 @@
 
 ![HCDSIM Workflow](images/HCDSIM_Figure1.png)
 
-HCDSIM models ten distinct complex hcCNA events, which are classified into three categories based on their genomic impact: copy-number (CN) loss, CN gain, and mirror-like reciprocal events (above figure). CN-loss-associated events include deletions (DEL; i.e., 0|0), where both alleles are lost. Loss of heterozygosity (LOH), defined as the loss of one parental allele, can occur in three distinct forms: LOH with copy number loss (CNL-LOH), where the remaining allele has a copy number of one (i.e., 1|0); copy-number neutral LOH (CNN-LOH), where one allele is lost while the other remains with a copy number of two (i.e., 2|0), preserving a normal total copy number but still exhibiting LOH; and copy-number gain LOH (CNG-LOH), where the remaining allele has a copy number above two (e.g., 3|0, 4|0). Whole-chromosome loss (WCL) results in the complete loss of a chromosome, affecting multiple loci simultaneously.CN gain-related hcCNAs primarily fall into three categories: duplication (DUP) is the most common form of CN gain, where a genomic region is duplicated; gain of heterozygosity (GOH), an increase in different alleles due to extra copies, potentially facilitating adaptation by introducing new mutations; and whole genome doubling (WGD), where the entire genome is duplicated, promoting chromosomal instability and tumor evolution by affecting multiple loci simultaneously.Additionally, mirror-like hcCNAs involve reciprocal CN swaps, either across loci (mirror-CNAs) or across subclones (Mirror-Subclone-CNAs). An example of mirror-CNA is two genomic bins (A and B) may have CN(A)=1 and CN(B)=2 in one haplotype, while in the other haplotype, the copy numbers are reversed, with CN(A)=2 and CN(B)=1. Similarly, in Mirror-Subclone-CNAs, two tumor subclones (c1 and c2), the copy numbers of a genomic region may be CN(c1)=1 and CN(c2)=3 in one haplotype, while in the other haplotype, the values are reversed, with CN(c1)=3 and CN(c2)=1. These events collectively capture the diverse genetic alterations driving tumor evolution.
+HCDSIM is a single-cell genomics simulator designed to model haplotype-, cell/clone-, and locus-specific copy number alterations (hcCNAs) along tumor evolutionary trajectories. It supports eleven distinct complex hcCNA events, classified into three categories based on their genomic impact:
+
+- **CN loss-associated events:** Deletion (DEL; 0|0), LOH with CN loss (CNL-LOH; 1|0), CN neutral LOH (CNN-LOH; 2|0), CN gain LOH (CNG-LOH; e.g., 3|0), arm-level deletion (ARM-DEL), and whole-chromosome loss (WCL).
+- **CN gain-related events:** Duplication (DUP), arm-level duplication (ARM-DUP), whole-chromosome duplication (WCD), and whole-genome duplication (WGD).
+- **Mirror-like reciprocal events:** Mirrored-subclonal-CNAs, characterized by reciprocal CN swaps between homologous haplotypes across distinct tumor clones (e.g., 1|3 in one clone and 3|1 in another), representing a signature of parallel evolution.
+
+These events can be further categorized by their genomic scales: **focal** (< 3 Mb), **medium** (3–10 Mb), and **broad** (> 10 Mb).
+
+By modeling these complex hcCNA events along evolutionary lineage trees, HCDSIM captures diverse patterns of intratumor heterogeneity and tumor evolution, generating simulated single-cell DNA sequencing data with ground-truth hcCNA profiles for the development and benchmarking of CNA callers.
 
 <a name="setup"></a>
 ## Installation
@@ -243,7 +251,6 @@ class HCDSIM:
                 chrom_cna_no: int = 2,
                 chrom_arm_rate: float = 0.75,
                 loh_cna_no: int = 15, 
-                goh_cna_no: int = 5, 
                 unique_ratio: float = 0.5,
                 barcode_len: int = 12,
                 lorenz_x: float = 0.5,
